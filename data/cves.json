@@ -35,9 +35,24 @@
     ],
     "history": [],
     "detail": {
-      "rootCause": "내부 메시징 컴포넌트가 수신 메시지의 출처를 검증하지 않아 스푸핑으로 인증을 우회할 수 있어 (CWE-290).",
+      "rootCause": "제품 내부 컴포넌트끼리 주고받는 메시징 채널이 있는데, 수신 측이 메시지가 정말 내부에서 왔는지를 채널 수준에서 인증하지 않고 메시지 안의 값이나 연결 형태만 보고 신뢰해. 외부 공격자가 내부 송신자인 척 메시지를 보내면, 원래 내부 전용인 파일 조작 기능이 인증 없이 실행돼 (CWE-290, 스푸핑에 의한 인증 우회). 세부 프로토콜은 공개 분석 글 기준으로만 확인돼서 아래는 개념 코드야.",
       "trigger": "자체 호스팅 어플라이언스가 네트워크에 노출돼 있으면 인증 없이 도달 가능.",
-      "patch": "BT26-05-RS 패치. 클라우드 인스턴스는 벤더가 적용."
+      "patch": "BT26-05-RS 패치. 클라우드 인스턴스는 벤더가 적용.",
+      "exploitation": "출처를 위장한 메시지로 무인증 파일 쓰기 프리미티브를 얻고, 그 파일이 이후 실행되는 위치에 놓이면서 원격 코드 실행으로 이어져. 8/29부터 제로데이로 악용됐고 지금은 Metasploit 모듈이 공개돼 있어.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "신뢰 경계 오류 (재구성, 실제 소스 아님, 개념)",
+          "lang": "Python",
+          "code": "def on_message(msg):\n    if msg.origin == \"internal\":   # 송신자가 스스로 주장하는 값\n        handle_internal(msg)      # 파일 쓰기 등 내부 전용 동작"
+        },
+        {
+          "kind": "fix",
+          "label": "수정 방향 (재구성, 실제 소스 아님, 개념)",
+          "lang": "Python",
+          "code": "def on_message(conn, msg):\n    if not conn.peer_authenticated():  # 채널 자체를 인증\n        raise PermissionError\n    handle_internal(msg)"
+        }
+      ]
     },
     "deepDive": null
   },
@@ -160,9 +175,25 @@
       }
     ],
     "detail": {
-      "rootCause": "CBitmapBuffer 생성자의 32비트 크기 곱셈이 wrap되어 실제보다 작은 버퍼를 할당하고, 이후 경계 검사는 선언된 크기 기준이라 힙 오버플로가 나.",
+      "rootCause": "CBitmapBuffer 생성자가 버퍼 크기를 width x height x 픽셀당 바이트로 계산하는데, 이 곱셈이 32비트에서 일어나. 호스트가 큰 해상도를 보내면 결과가 2^32를 넘어 wrap되고, 실제 필요한 것보다 훨씬 작은 버퍼(보고서 기준 약 4MB)가 할당돼. 문제는 이후 디코딩 루프가 할당된 크기가 아니라 헤더에 선언된 width/height를 기준으로 경계를 검사한다는 거야. 할당과 사용이 서로 다른 크기를 믿는 전형적인 CWE-190 → CWE-122 조합이야.",
       "trigger": "뷰어가 악성 호스트에 접속. 호스트가 H.264/AV1을 거부해 raw 비트맵 경로로 떨어져야 해.",
-      "patch": "15.83에서 수정."
+      "patch": "15.83에서 수정.",
+      "exploitation": "할당보다 큰 데이터를 힙에 쓰는 선형 오버플로 프리미티브가 생겨. 쓰는 내용이 화면 비트맵이라 공격자가 바이트를 거의 그대로 통제할 수 있어. Remedio가 DEP와 CFG를 우회한 코드 실행을 시연했지만 우회 방법의 세부는 공개되지 않았어.",
+      "detection": "공개된 IOC는 없어. 뷰어 프로세스(TeamViewer.exe)의 비정상 종료나 WER 크래시 리포트가 단서가 될 수 있어 (추정).",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "취약한 크기 계산 (재구성, 실제 소스 아님)",
+          "lang": "C++",
+          "code": "uint32_t size = width * height * bpp;   // 32비트 곱셈, 큰 값에서 wrap\nuint8_t* buf = (uint8_t*)malloc(size);  // 실제 필요량보다 작게 할당\n\nfor (uint32_t y = 0; y < height; y++)  // 경계는 선언된 height 기준\n    memcpy(buf + y * stride, src + y * stride, stride);"
+        },
+        {
+          "kind": "fix",
+          "label": "수정 방향 (재구성, 실제 소스 아님)",
+          "lang": "C++",
+          "code": "uint64_t size = (uint64_t)width * height * bpp;  // 64비트로 계산\nif (size == 0 || size > kMaxBitmapBytes)\n    return E_INVALIDARG;                         // 상한 검사 후 할당"
+        }
+      ]
     },
     "deepDive": null
   },
@@ -227,9 +258,23 @@
     ],
     "history": [],
     "detail": {
-      "rootCause": "예측 가능한 식별자(CWE-340)로 디스크의 알려진 경로에 내용을 올릴 수 있어.",
+      "rootCause": "업로드 처리 과정에서 임시 파일 경로를 사용자 입력(파일 이름)만으로 결정적으로 만들어. 보조 분석 글은 이를 wu.cgi의 임시 파일 경로가 파일 이름의 MD5로 정해지는 문제로 설명하는데, 이 CVE와의 매핑은 확정되지 않았어 (추정). 경로를 미리 알 수 있으니 체인의 다른 단계가 그 파일을 참조하게 만들 수 있어 (CWE-340).",
       "trigger": "인증된 공격자. UTA0576 체인에서 앞 단계와 결합.",
-      "patch": "25.1.1.3 / 22.8R2.6."
+      "patch": "25.1.1.3 / 22.8R2.6.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "예측 가능한 임시 경로 (재구성, 실제 소스 아님, 추정)",
+          "lang": "Python",
+          "code": "tmp = \"/tmp/upload_\" + md5(filename).hexdigest()  # 입력만으로 경로 결정\nwith open(tmp, \"wb\") as f:\n    f.write(body)"
+        },
+        {
+          "kind": "fix",
+          "label": "수정 방향 (재구성, 실제 소스 아님, 추정)",
+          "lang": "Python",
+          "code": "fd, tmp = tempfile.mkstemp(dir=UPLOAD_DIR)  # 예측 불가능한 이름, 0600\nwith os.fdopen(fd, \"wb\") as f:\n    f.write(body)"
+        }
+      ]
     },
     "deepDive": null
   },
@@ -261,9 +306,23 @@
     ],
     "history": [],
     "detail": {
-      "rootCause": "Node-RED HTTP 인터페이스에 인증이 없어 플로우를 만들어 최고 권한으로 코드를 실행할 수 있어.",
+      "rootCause": "IoT2050 Advanced에 들어간 Node-RED 편집기와 관리 HTTP API가 인증 없이 열려 있었어. Node-RED는 플로우 안에 exec 노드나 function 노드로 임의 명령과 JS를 넣을 수 있게 설계된 도구라, 관리 API에 접근할 수 있다는 것 자체가 그 프로세스 권한의 코드 실행이야 (CWE-306). 버그라기보다 출하 구성 문제에 가까워. 아래는 Node-RED 설정 파일 기준으로 본 개념 예시야.",
       "trigger": "해당 인터페이스가 네트워크에 노출된 장비.",
-      "patch": "V4.3.4.1."
+      "patch": "V4.3.4.1.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "인증 없는 구성 (재구성, 실제 소스 아님, 추정)",
+          "lang": "JavaScript",
+          "code": "// settings.js\nmodule.exports = {\n    uiPort: 1880,\n    // adminAuth 없음: /flows 등 관리 API가 그대로 열림\n};"
+        },
+        {
+          "kind": "fix",
+          "label": "수정 방향 (재구성, 실제 소스 아님, 추정)",
+          "lang": "JavaScript",
+          "code": "module.exports = {\n    uiPort: 1880,\n    uiHost: \"127.0.0.1\",           // 외부 바인딩 차단\n    adminAuth: { type: \"credentials\", users: [/* ... */] },\n};"
+        }
+      ]
     },
     "deepDive": null
   },
@@ -294,9 +353,23 @@
     ],
     "history": [],
     "detail": {
-      "rootCause": "FrameDecoder.cpp의 onOutputReceived에서 힙 버퍼 오버플로(범위 밖 쓰기).",
+      "rootCause": "미디어 프레임 디코더(FrameDecoder.cpp)의 onOutputReceived가 코덱이 돌려준 출력 버퍼를 미리 할당한 프레임 버퍼로 복사할 때, 복사 길이와 대상 버퍼의 남은 용량을 맞춰보지 않아 힙 범위 밖 쓰기가 나 (CWE-787). 썸네일 추출처럼 사용자 조작 없이 미디어를 디코딩하는 경로에서 호출되기 때문에 제로클릭이 돼. AOSP 커밋을 직접 확인하지 못해서 아래 코드는 CVE 설명에서 재구성한 거야.",
       "trigger": "추가 권한이나 사용자 상호작용 없이 원격 트리거 가능.",
-      "patch": "보안 패치 레벨 2026-11-05 이상."
+      "patch": "보안 패치 레벨 2026-11-05 이상.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "취약 패턴 (재구성, 실제 소스 아님, 추정)",
+          "lang": "C++",
+          "code": "void FrameDecoder::onOutputReceived(const sp<MediaCodecBuffer>& out, ...) {\n    // 코덱이 보고한 크기를 그대로 믿고 복사\n    memcpy(frame->data() + offset, out->data(), out->size());\n}"
+        },
+        {
+          "kind": "fix",
+          "label": "수정 방향 (재구성, 실제 소스 아님, 추정)",
+          "lang": "C++",
+          "code": "if (offset > frame->capacity() ||\n    out->size() > frame->capacity() - offset) {\n    return ERROR_MALFORMED;  // 남은 용량 검사\n}"
+        }
+      ]
     },
     "deepDive": null
   },

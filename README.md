@@ -31,7 +31,8 @@ data/runs.json         날짜별 실행 기록 배열
 | tags | string[] | |
 | links | {label, url}[] | 원본 소스 |
 | history | {date, note}[] | 상태 변화 이력 |
-| detail | object \| null | 기술 상세: rootCause, trigger, exploitation, patch, detection (각 문자열, 없으면 생략) |
+| detail | object \| null | 기술 상세: rootCause, trigger, exploitation, patch, detection (각 문자열, 없으면 생략), code |
+| detail.code | {kind, label, lang, code}[] | 근본 원인 아래에 표시하는 코드. kind는 "vuln" 또는 "fix". 취약 패턴과 수정 방향을 보여주는 용도이며 익스플로잇 코드는 넣지 않는다. 실제 소스가 아니면 label에 재구성이라고 밝힌다 |
 | deepDive | string \| null | 심층 설명한 날짜 |
 
 `data/runs.json`: 날짜 오름차순 배열 `{date, note, count, deepDive}`

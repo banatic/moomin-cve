@@ -58,6 +58,10 @@
   .lnk{display:inline-flex;align-items:center;min-height:32px;padding:6px 10px;border-radius:4px;border:1px solid var(--field);text-decoration:none;font-size:12.5px}
   .hist{display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 10px;font-size:12.5px}
   .hist .d{font-family:var(--mono);color:var(--mut)}
+  .code{margin:6px 0 0;border:1px solid var(--line);border-radius:4px;background:#0c0c0c;overflow:hidden}
+  .code .cap{display:flex;justify-content:space-between;gap:8px;padding:5px 10px;border-bottom:1px solid var(--line);font-size:11.5px;color:var(--mut)}
+  .code pre{margin:0;padding:10px;overflow-x:auto;font:12px/1.55 var(--mono);color:#d4d4d4;tab-size:4}
+  .code .bad{color:var(--red)}.code .good{color:var(--green)}
   .empty{color:var(--mut);text-align:center;padding:60px 0}
   .off{display:none;padding:8px 6px 0;font-size:12px;color:var(--orange)}
 </style>
@@ -82,7 +86,8 @@ function tagOf(it){if(it.kev)return"KEV";if(it.cvss!=null)return String(it.cvss)
 function itemHtml(it){
   const c=(G[it.grade]||G.gray)[1];
   const det=it.detail||{};
-  const secs=D.filter(([k])=>det[k]).map(([k,l])=>`<div><div class="k">${l}</div><div class="v">${esc(det[k])}</div></div>`).join("");
+  const codeHtml=(det.code||[]).map(c=>`<div class="code"><div class="cap"><span class="${c.kind==="fix"?"good":c.kind==="vuln"?"bad":""}">${esc(c.label)}</span><span>${esc(c.lang||"")}</span></div><pre><code>${esc(c.code)}</code></pre></div>`).join("");
+  const secs=D.filter(([k])=>det[k]||(k==="rootCause"&&codeHtml)).map(([k,l])=>`<div><div class="k">${l}</div>${det[k]?`<div class="v">${esc(det[k])}</div>`:""}${k==="rootCause"?codeHtml:""}</div>`).join("");
   const links=(it.links||[]).map(l=>({u:safeUrl(l.url),t:l.label||"링크"})).filter(l=>l.u);
   const src=links.length?`<div class="src">${links.map((l,i)=>`<a class="${i?"lnk":"btn"}" href="${esc(l.u)}" target="_blank" rel="noopener">${esc(i?l.t:l.t+" 열기")}</a>`).join("")}</div>`:"";
   const hist=(it.history||[]).length?`<div><div class="k">변화</div><div class="hist">${it.history.map(h=>`<span class="d">${esc(h.date.slice(5))}</span><span>${esc(h.note)}</span>`).join("")}</div></div>`:"";
