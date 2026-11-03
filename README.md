@@ -31,10 +31,13 @@ data/runs.json         날짜별 실행 기록 배열
 | tags | string[] | |
 | links | {label, url}[] | 원본 소스 |
 | history | {date, note}[] | 상태 변화 이력 |
+| detail | object \| null | 기술 상세: rootCause, trigger, exploitation, patch, detection (각 문자열, 없으면 생략) |
 | deepDive | string \| null | 심층 설명한 날짜 |
 
 `data/runs.json`: 날짜 오름차순 배열 `{date, note, count, deepDive}`
 
 ## 규칙
 
-- 앱 UI와 data/*.json 어디에도 이모지를 쓰지 않는다. 등급은 색 점(CSS)과 텍스트로 표시한다.
+- 앱 UI와 data/*.json 어디에도 이모지를 쓰지 않는다.
+- 가운뎃점(·)을 쓰지 않는다. 쉼표나 공백으로 구분한다.
+- 다크 단일 테마, 무채색 바탕. 색은 등급색(#f85149, #d29922, #3fb950, #8a8a8a)만 쓴다.

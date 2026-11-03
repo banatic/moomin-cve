@@ -5,117 +5,118 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>moomin-cve</title>
 <meta name="description" content="매일 아침 정리하는 CVE 브리핑 기록">
-<meta name="theme-color" content="#fafaf9" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#1c1917" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#161616">
+<meta name="color-scheme" content="dark">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Noto+Sans+KR:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-  :root{--bg:#fafaf9;--fg:#1c1917;--mut:#78716c;--line:#e7e5e4;--card:#fff;
-    --red:#dc2626;--org:#ea580c;--grn:#16a34a;--gry:#a8a29e;}
-  @media (prefers-color-scheme:dark){:root{--bg:#1c1917;--fg:#f5f5f4;--mut:#a8a29e;--line:#3f3a36;--card:#292524;}}
+  :root{
+    --bg:#161616; --card:#1f1f1f; --line:#2a2a2a; --field:#333333;
+    --fg:#ededed; --mut:#8a8a8a; --sub:#b5b5b5;
+    --red:#f85149; --orange:#d29922; --green:#3fb950; --gray:#8a8a8a;
+    --sans:"Segoe UI Variable Text","Segoe UI","Malgun Gothic","Noto Sans KR",-apple-system,sans-serif;
+    --display:"Segoe UI Variable Display","Segoe UI","Malgun Gothic","Noto Sans KR",-apple-system,sans-serif;
+    --mono:"JetBrains Mono","Cascadia Mono",Consolas,ui-monospace,monospace;
+  }
   *{box-sizing:border-box}
   html{-webkit-text-size-adjust:100%}
-  body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.55 -apple-system,"Pretendard","Apple SD Gothic Neo","Malgun Gothic",sans-serif}
-  header{position:sticky;top:0;background:var(--bg);border-bottom:1px solid var(--line);
-    padding:calc(12px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) 10px calc(16px + env(safe-area-inset-left));z-index:2}
-  .hrow{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
-  h1{font-size:18px;margin:0 0 8px}
-  .upd{font-size:12px;color:var(--mut)}
-  .bar{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
-  input[type=search]{flex:1;min-width:160px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--fg);font:inherit}
-  .chip{border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:999px;padding:4px 10px;font:inherit;font-size:13px;cursor:pointer}
-  .chip.on{background:var(--fg);color:var(--bg);border-color:var(--fg)}
-  main{padding:8px calc(16px + env(safe-area-inset-right)) calc(40px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left));max-width:860px;margin:0 auto}
-  .day{margin-top:18px}
-  .day h2{font-size:14px;color:var(--mut);margin:0 0 6px;font-weight:600}
-  .note{font-size:13px;color:var(--mut);margin:0 0 8px}
-  .item{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--gry);border-radius:8px;padding:10px 12px;margin-bottom:8px}
-  .item.red{border-left-color:var(--red)}.item.orange{border-left-color:var(--org)}.item.green{border-left-color:var(--grn)}
-  .top{display:flex;gap:6px;align-items:baseline;flex-wrap:wrap}
-  .id{font-weight:700;font-family:ui-monospace,Consolas,monospace;font-size:14px}
-  .tag{font-size:11px;padding:1px 6px;border-radius:4px;border:1px solid var(--line);color:var(--mut)}
-  .tag.kev{color:var(--red);border-color:var(--red)}.tag.poc{color:var(--org);border-color:var(--org)}
-  .prod{font-size:13px;color:var(--mut)}
-  .ttl{font-weight:600;margin-top:2px}
-  .sum{margin:4px 0 0;font-size:14px}
-  .hist{margin:6px 0 0;font-size:12px;color:var(--mut)}
-  .tags{margin-top:6px;display:flex;gap:4px;flex-wrap:wrap}
-  .tags button{font:inherit;font-size:11px;background:none;border:none;color:var(--mut);padding:0;cursor:pointer}
-  a{color:inherit}
-  .links{font-size:12px;margin-top:6px;display:flex;gap:10px;flex-wrap:wrap}
-  .empty{color:var(--mut);text-align:center;padding:40px 0}
-  .stats{font-size:12px;color:var(--mut);margin-top:6px}
-  .dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--gry);margin-right:5px;vertical-align:1px}
-  .dot.red{background:var(--red)}.dot.orange{background:var(--org)}.dot.green{background:var(--grn)}
-  .item .dot{align-self:center;margin-right:0}
-  .off{display:none;font-size:12px;color:var(--org);margin-top:4px}
+  body{margin:0;background:var(--bg);color:var(--fg);font:13.5px/1.45 var(--sans)}
+  a{color:var(--fg)}a:hover{color:#fff}
+  header{position:sticky;top:0;z-index:2;background:var(--bg);border-bottom:1px solid var(--line);
+    padding:calc(12px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) 12px calc(16px + env(safe-area-inset-left))}
+  .mark{display:inline-flex;align-items:center;font:700 15px/1 var(--mono);letter-spacing:-0.01em;color:var(--fg)}
+  .mark .p{color:var(--mut);margin-right:8px}
+  .mark .cur{display:inline-block;width:.6em;height:1.1em;margin-left:3px;background:var(--red)}
+  main{max-width:720px;margin:0 auto;padding:0 calc(10px + env(safe-area-inset-right)) calc(32px + env(safe-area-inset-bottom)) calc(10px + env(safe-area-inset-left))}
+  .day{padding:22px 6px 6px;font:600 28px/1.2 var(--display)}
+  .note{padding:2px 6px 0;color:var(--mut)}
+  .glabel{padding:14px 6px 6px;font-weight:600;font-size:13px}
+  .list{display:flex;flex-direction:column;gap:3px}
+  .item{background:var(--card);border:1px solid var(--line);border-radius:4px}
+  .row{width:100%;min-height:64px;display:flex;align-items:center;gap:14px;padding:10px 14px;background:none;border:none;text-align:left;font:inherit;color:inherit;cursor:pointer}
+  .row svg.sh{flex:none}
+  .tx{display:flex;flex-direction:column;flex:1;min-width:0}
+  .tt{font-weight:500;font-size:14px}
+  .meta{display:flex;flex-wrap:wrap;gap:0 8px;font-size:12px;color:var(--mut)}
+  .meta .id{font-family:var(--mono)}
+  .tag{font-size:12px;color:var(--sub);flex:none}
+  .chev{flex:none;transition:transform .15s}
+  .item.open .chev{transform:rotate(180deg)}
+  .body{display:none;border-top:1px solid var(--line);padding:12px 14px 14px 48px;flex-direction:column;gap:12px}
+  .item.open .body{display:flex}
+  .k{font-size:12px;color:var(--mut)}
+  .v{white-space:pre-line}
+  .src{display:flex;flex-wrap:wrap;gap:6px}
+  .btn{display:inline-flex;align-items:center;min-height:32px;padding:6px 12px;border-radius:4px;background:var(--fg);color:var(--bg);text-decoration:none;font-weight:600}
+  .btn:hover{color:var(--bg);background:#fff}
+  .lnk{display:inline-flex;align-items:center;min-height:32px;padding:6px 10px;border-radius:4px;border:1px solid var(--field);text-decoration:none;font-size:12.5px}
+  .hist{display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 10px;font-size:12.5px}
+  .hist .d{font-family:var(--mono);color:var(--mut)}
+  .empty{color:var(--mut);text-align:center;padding:60px 0}
+  .off{display:none;padding:8px 6px 0;font-size:12px;color:var(--orange)}
 </style>
 </head>
 <body>
-<header>
-  <div class="hrow"><h1>moomin-cve</h1><span class="upd" id="upd"></span></div>
-  <div class="bar"><input type="search" id="q" placeholder="CVE, 제품, 태그 검색"></div>
-  <div class="bar" style="margin-top:6px" id="grades">
-    <button class="chip on" data-g="all">전체</button>
-    <button class="chip" data-g="red"><span class="dot red"></span>즉시 확인</button>
-    <button class="chip" data-g="orange"><span class="dot orange"></span>주의</button>
-    <button class="chip" data-g="green"><span class="dot green"></span>흥미</button>
-    <button class="chip" data-g="gray"><span class="dot gray"></span>과장 체크</button>
-  </div>
-  <div class="stats" id="stats"></div>
-  <div class="off" id="off">오프라인: 저장된 데이터를 보여주는 중</div>
-</header>
-<main id="list"><div class="empty">불러오는 중…</div></main>
+<header><span class="mark" role="img" aria-label="moomin-cve"><span class="p">&gt;</span>moomin-cve<span class="cur"></span></span></header>
+<main id="list"><div class="empty">불러오는 중</div></main>
 <script>
-const GN={red:"즉시 확인",orange:"주의",green:"흥미",gray:"과장 체크"};
-const dot=g=>`<span class="dot ${g}" aria-label="${GN[g]||""}"></span>`;
-const ORD={red:0,orange:1,green:2,gray:3};
-let items=[],runs={},grade="all",q="";
+const G={red:["실제 악용","--red"],orange:["주의","--orange"],green:["흥미","--green"],gray:["과장 점검","--gray"]};
+const ORDER=["red","orange","green","gray"];
+const D=[["rootCause","근본 원인"],["trigger","트리거 조건"],["exploitation","익스플로잇 흐름"],["patch","패치"],["detection","탐지"]];
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const safeUrl=u=>/^https?:\/\//.test(u||"")?u:null;
+const kdate=d=>{const[,m,dd]=d.split("-").map(Number);return `${m}월 ${dd}일`;};
+const shield=c=>`<svg class="sh" width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M10 2.5 16 5v4.6c0 3.7-2.5 6.6-6 7.9-3.5-1.3-6-4.2-6-7.9V5z" stroke="var(${c})" stroke-width="1.5" stroke-linejoin="round"/><path d="M10 7v3.5M10 13h.01" stroke="var(${c})" stroke-width="1.6" stroke-linecap="round"/></svg>`;
+const chev=`<svg class="chev" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#b5b5b5" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><path d="M3 4.5l3 3 3-3"/></svg>`;
+let items=[],runs={},openId=null;
 
-function render(){
-  const f=items.filter(it=>{
-    if(grade!=="all"&&it.grade!==grade)return false;
-    if(!q)return true;
-    return [it.cve,it.title,it.product,it.summary,(it.tags||[]).join(" ")].join(" ").toLowerCase().includes(q);
-  });
-  const c={red:0,orange:0,green:0,gray:0};items.forEach(i=>i.grade in c&&c[i.grade]++);
-  $("#stats").innerHTML=`총 ${items.length}건 · ${dot("red")}${c.red} ${dot("orange")}${c.orange} ${dot("green")}${c.green} ${dot("gray")}${c.gray}`;
-  const byDay={};f.forEach(it=>{(byDay[it.date]=byDay[it.date]||[]).push(it)});
-  const days=Object.keys(byDay).sort().reverse();
-  if(!days.length){$("#list").innerHTML=`<div class="empty">${items.length?"조건에 맞는 항목이 없어.":"아직 기록이 없어."}</div>`;return;}
-  $("#list").innerHTML=days.map(d=>{
-    const r=runs[d];
-    const rows=byDay[d].sort((a,b)=>(ORD[a.grade]??9)-(ORD[b.grade]??9)).map(it=>{
-      const links=(it.links||[]).map(l=>{const u=safeUrl(l.url);return u?`<a href="${esc(u)}" target="_blank" rel="noopener">${esc(l.label||"링크")}</a>`:""}).join("");
-      const hist=(it.history||[]).map(h=>`${esc(h.date)}: ${esc(h.note)}`).join(" · ");
-      const tags=(it.tags||[]).map(t=>`<button data-tag="${esc(t)}">#${esc(t)}</button>`).join("");
-      return `<div class="item ${esc(it.grade)}">
-        <div class="top">${it.grade in GN?dot(it.grade):""}<span class="id">${esc(it.cve)}</span>
-          ${it.kev?'<span class="tag kev">KEV</span>':""}${it.poc?'<span class="tag poc">PoC</span>':""}
-          ${it.cvss!=null?`<span class="tag">CVSS ${esc(it.cvss)}</span>`:""}
-          ${it.deepDive?`<span class="tag">심층 ${esc(it.deepDive)}</span>`:""}</div>
-        <div class="prod">${esc(it.product)}</div>
-        ${it.title?`<div class="ttl">${esc(it.title)}</div>`:""}
-        <p class="sum">${esc(it.summary)}</p>
-        ${hist?`<p class="hist">변화: ${hist}</p>`:""}
-        ${links?`<div class="links">${links}</div>`:""}
-        ${tags?`<div class="tags">${tags}</div>`:""}
-      </div>`}).join("");
-    return `<section class="day"><h2>${esc(d)}</h2>${r&&r.note?`<p class="note">${esc(r.note)}</p>`:""}${rows}</section>`;
-  }).join("");
+function tagOf(it){if(it.kev)return"KEV";if(it.cvss!=null)return String(it.cvss);if(it.poc)return"PoC";return"";}
+
+function itemHtml(it){
+  const c=(G[it.grade]||G.gray)[1];
+  const det=it.detail||{};
+  const secs=D.filter(([k])=>det[k]).map(([k,l])=>`<div><div class="k">${l}</div><div class="v">${esc(det[k])}</div></div>`).join("");
+  const links=(it.links||[]).map(l=>({u:safeUrl(l.url),t:l.label||"링크"})).filter(l=>l.u);
+  const src=links.length?`<div class="src">${links.map((l,i)=>`<a class="${i?"lnk":"btn"}" href="${esc(l.u)}" target="_blank" rel="noopener">${esc(i?l.t:l.t+" 열기")}</a>`).join("")}</div>`:"";
+  const hist=(it.history||[]).length?`<div><div class="k">변화</div><div class="hist">${it.history.map(h=>`<span class="d">${esc(h.date.slice(5))}</span><span>${esc(h.note)}</span>`).join("")}</div></div>`:"";
+  const open=openId===it.cve;
+  return `<div class="item${open?" open":""}" data-id="${esc(it.cve)}">
+    <button class="row" aria-expanded="${open}">${shield(c)}
+      <span class="tx"><span class="tt">${esc(it.title)}</span><span class="meta"><span>${esc(it.product)}</span><span class="id">${esc(it.cve)}</span></span></span>
+      <span class="tag">${esc(tagOf(it))}</span>${chev}</button>
+    <div class="body">
+      <div><div class="k">요약</div><div class="v">${esc(it.summary)}</div></div>
+      ${secs}${hist}${src}
+    </div></div>`;
 }
 
-$("#q").addEventListener("input",e=>{q=e.target.value.trim().toLowerCase();render()});
-$("#grades").addEventListener("click",e=>{const b=e.target.closest(".chip");if(!b)return;
-  grade=b.dataset.g;document.querySelectorAll("#grades .chip").forEach(x=>x.classList.toggle("on",x===b));render()});
-$("#list").addEventListener("click",e=>{const t=e.target.closest("[data-tag]");if(!t)return;
-  $("#q").value=t.dataset.tag;q=t.dataset.tag.toLowerCase();render();window.scrollTo({top:0})});
+function render(){
+  if(!items.length){$("#list").innerHTML='<div class="empty">아직 기록이 없어</div>';return;}
+  const byDay={};items.forEach(it=>{(byDay[it.date]=byDay[it.date]||[]).push(it)});
+  const days=Object.keys(byDay).sort().reverse();
+  $("#list").innerHTML=`<div class="off" id="off">오프라인, 저장된 데이터를 보여주는 중</div>`+days.map(d=>{
+    const groups=ORDER.map(g=>{const its=byDay[d].filter(i=>i.grade===g).sort((a,b)=>a.cve.localeCompare(b.cve));
+      return its.length?`<div class="glabel">${G[g][0]}</div><div class="list">${its.map(itemHtml).join("")}</div>`:"";}).join("");
+    const r=runs[d];
+    return `<section><div class="day">${kdate(d)}</div>${r&&r.note?`<div class="note">${esc(r.note)}</div>`:""}${groups}</section>`;
+  }).join("");
+  $("#off").style.display=navigator.onLine?"none":"block";
+}
+
+$("#list").addEventListener("click",e=>{
+  const b=e.target.closest(".row");if(!b)return;
+  const el=b.closest(".item");const id=el.dataset.id;
+  openId=openId===id?null:id;
+  document.querySelectorAll(".item.open").forEach(x=>{if(x!==el){x.classList.remove("open");x.querySelector(".row").setAttribute("aria-expanded","false")}});
+  el.classList.toggle("open",openId===id);b.setAttribute("aria-expanded",String(openId===id));
+});
 
 async function load(){
   try{
@@ -123,11 +124,8 @@ async function load(){
     if(!a.ok)throw new Error(a.status);
     items=await a.json();
     runs={};(b.ok?await b.json():[]).forEach(r=>runs[r.date]=r);
-    const last=Object.keys(runs).sort().pop();
-    $("#upd").textContent=last?`마지막 실행 ${last}`:"";
-    $("#off").style.display=navigator.onLine?"none":"block";
     render();
-  }catch(err){$("#list").innerHTML='<div class="empty">데이터를 불러오지 못했어.</div>';}
+  }catch(err){$("#list").innerHTML='<div class="empty">데이터를 불러오지 못했어</div>';}
 }
 load();
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")load()});

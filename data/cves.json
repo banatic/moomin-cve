@@ -34,6 +34,11 @@
       }
     ],
     "history": [],
+    "detail": {
+      "rootCause": "내부 메시징 컴포넌트가 수신 메시지의 출처를 검증하지 않아 스푸핑으로 인증을 우회할 수 있어 (CWE-290).",
+      "trigger": "자체 호스팅 어플라이언스가 네트워크에 노출돼 있으면 인증 없이 도달 가능.",
+      "patch": "BT26-05-RS 패치. 클라우드 인스턴스는 벤더가 적용."
+    },
     "deepDive": null
   },
   {
@@ -42,7 +47,7 @@
     "grade": "red",
     "title": "Ivanti Connect Secure 인증 우회 RCE (체인 1단계)",
     "product": "Ivanti Connect Secure",
-    "summary": "스푸핑 기반 인증 우회(CWE-290)로 무인증 원격 명령 실행이 되는 체인의 시작점이야. 10/13 공개·패치됐고 제로데이로 악용됐어. 같은 날 KEV에 등재됐어.",
+    "summary": "스푸핑 기반 인증 우회(CWE-290)로 무인증 원격 명령 실행이 되는 체인의 시작점이야. 10/13 공개, 패치됐고 제로데이로 악용됐어. 같은 날 KEV에 등재됐어.",
     "cvss": null,
     "kev": true,
     "poc": false,
@@ -72,6 +77,11 @@
         "note": "기록 정정: CISA 공지로 10/13 KEV 등재 확인 (새 등재 아님)"
       }
     ],
+    "detail": {
+      "rootCause": "스푸핑 기반 인증 우회 (CWE-290). UTA0576 체인의 진입 단계.",
+      "trigger": "인터넷에 노출된 Connect Secure, 인증 불필요.",
+      "patch": "10/13 패치. 체인의 다른 두 CVE까지 막으려면 25.1.1.3 / 22.8R2.6 필요."
+    },
     "deepDive": null
   },
   {
@@ -80,7 +90,7 @@
     "grade": "red",
     "title": "Ivanti Connect Secure 권한 상승 (체인 2단계)",
     "product": "Ivanti Connect Secure",
-    "summary": "로컬 인증 사용자가 root까지 올라가는 인증 누락 버그로, CVE-2026-104935와 묶여 무인증 root가 됐어. UTA0576이 10/3부터 악용했고 LAPS 비밀번호·BitLocker 복구 키를 AD에서 조회했어. 10/13 패치로는 안 막히고 25.1.1.3 / 22.8R2.6이 필요해.",
+    "summary": "로컬 인증 사용자가 root까지 올라가는 인증 누락 버그로, CVE-2026-104935와 묶여 무인증 root가 됐어. UTA0576이 10/3부터 악용했고 LAPS 비밀번호, BitLocker 복구 키를 AD에서 조회했어. 10/13 패치로는 안 막히고 25.1.1.3 / 22.8R2.6이 필요해.",
     "cvss": 8.8,
     "kev": true,
     "poc": false,
@@ -105,6 +115,11 @@
       }
     ],
     "history": [],
+    "detail": {
+      "rootCause": "인증 누락으로 로컬 인증 사용자가 root까지 상승.",
+      "trigger": "CVE-2026-104935와 묶이면 무인증 root.",
+      "patch": "25.1.1.3 / 22.8R2.6. 10/13 패치로는 안 막힘."
+    },
     "deepDive": null
   },
   {
@@ -113,7 +128,7 @@
     "grade": "orange",
     "title": "TeamViewer 화면 디코더 정수 오버플로",
     "product": "TeamViewer Full Client / Portable / Android 앱",
-    "summary": "CBitmapBuffer 생성자의 32비트 곱셈이 wrap되어 약 4MB만 할당한 채 원래 크기로 디코딩하면서 힙 오버플로가 나. 악성 호스트에 접속한 뷰어 쪽이 공격받는 구조고 Remedio가 DEP·CFG 우회를 시연했어. 15.83에서 수정, 악용 보고는 없고 공개 코드 존재 여부는 확인 못 함.",
+    "summary": "CBitmapBuffer 생성자의 32비트 곱셈이 wrap되어 약 4MB만 할당한 채 원래 크기로 디코딩하면서 힙 오버플로가 나. 악성 호스트에 접속한 뷰어 쪽이 공격받는 구조고 Remedio가 DEP, CFG 우회를 시연했어. 15.83에서 수정, 악용 보고는 없고 공개 코드 존재 여부는 확인 못 함.",
     "cvss": 8.8,
     "kev": false,
     "poc": false,
@@ -144,6 +159,11 @@
         "note": "KISA 11/2 권고 발행 확인"
       }
     ],
+    "detail": {
+      "rootCause": "CBitmapBuffer 생성자의 32비트 크기 곱셈이 wrap되어 실제보다 작은 버퍼를 할당하고, 이후 경계 검사는 선언된 크기 기준이라 힙 오버플로가 나.",
+      "trigger": "뷰어가 악성 호스트에 접속. 호스트가 H.264/AV1을 거부해 raw 비트맵 경로로 떨어져야 해.",
+      "patch": "15.83에서 수정."
+    },
     "deepDive": null
   },
   {
@@ -172,6 +192,11 @@
       }
     ],
     "history": [],
+    "detail": {
+      "rootCause": "FileSystem 컴포넌트의 메모리 손상 (CWE-119). Chromium 버그가 비공개라 세부는 미공개.",
+      "trigger": "조작된 웹페이지 방문.",
+      "patch": "156.0.8078.73 / .74."
+    },
     "deepDive": null
   },
   {
@@ -201,6 +226,11 @@
       }
     ],
     "history": [],
+    "detail": {
+      "rootCause": "예측 가능한 식별자(CWE-340)로 디스크의 알려진 경로에 내용을 올릴 수 있어.",
+      "trigger": "인증된 공격자. UTA0576 체인에서 앞 단계와 결합.",
+      "patch": "25.1.1.3 / 22.8R2.6."
+    },
     "deepDive": null
   },
   {
@@ -209,7 +239,7 @@
     "grade": "red",
     "title": "SIMATIC IoT2050 Node-RED 무인증 RCE 악용",
     "product": "Siemens SIMATIC IoT2050 Advanced (Node-RED)",
-    "summary": "Node-RED HTTP 인터페이스에 인증이 없어 무인증 공격자가 플로우를 만들어 최고 권한으로 코드를 실행해. VulnCheck가 10/30부터 허니팟에서 봇넷 드로퍼·재부팅 후에도 남는 HTTP 백도어 설치를 관측했어. V4.3.4.1에서 수정, KEV 등재는 확인 못 함.",
+    "summary": "Node-RED HTTP 인터페이스에 인증이 없어 무인증 공격자가 플로우를 만들어 최고 권한으로 코드를 실행해. VulnCheck가 10/30부터 허니팟에서 봇넷 드로퍼와 재부팅 후에도 남는 HTTP 백도어 설치를 관측했어. VulnCheck KEV에는 올라갔고 CISA KEV에는 없어.",
     "cvss": 10,
     "kev": false,
     "poc": false,
@@ -230,6 +260,11 @@
       }
     ],
     "history": [],
+    "detail": {
+      "rootCause": "Node-RED HTTP 인터페이스에 인증이 없어 플로우를 만들어 최고 권한으로 코드를 실행할 수 있어.",
+      "trigger": "해당 인터페이스가 네트워크에 노출된 장비.",
+      "patch": "V4.3.4.1."
+    },
     "deepDive": null
   },
   {
@@ -238,7 +273,7 @@
     "grade": "orange",
     "title": "Android Framework 제로클릭 RCE",
     "product": "Android 14~17",
-    "summary": "11월 불레틴의 최고 심각도 항목으로 추가 권한·사용자 상호작용 없이 RCE가 가능해. System의 CVE-2026-58936도 Critical RCE야. 216건 패치, 패치 레벨 2026-11-05 이상 권장, 악용 보고는 없어.",
+    "summary": "11월 불레틴의 최고 심각도 항목으로 추가 권한이나 사용자 상호작용 없이 RCE가 가능해. 같이 묶인 CVE-2026-58936은 Android 자체 코드가 아니라 서드파티 libpng의 use-after-free야. 패치 레벨 2026-11-05 이상 권장, 악용 보고는 없어.",
     "cvss": null,
     "kev": false,
     "poc": false,
@@ -258,6 +293,11 @@
       }
     ],
     "history": [],
+    "detail": {
+      "rootCause": "FrameDecoder.cpp의 onOutputReceived에서 힙 버퍼 오버플로(범위 밖 쓰기).",
+      "trigger": "추가 권한이나 사용자 상호작용 없이 원격 트리거 가능.",
+      "patch": "보안 패치 레벨 2026-11-05 이상."
+    },
     "deepDive": null
   },
   {
@@ -293,6 +333,11 @@
       }
     ],
     "history": [],
+    "detail": {
+      "rootCause": "인터넷에서 받은 파일의 Mark of the Web 경고를 건너뛰게 하는 보안 기능 우회. MS는 CWE-77로 분류, 세부 메커니즘은 미공개.",
+      "trigger": "사용자가 파일을 열어야 해.",
+      "patch": "10월 누적 업데이트. Edge는 154.0.4258.62 이상."
+    },
     "deepDive": null
   }
 ]
