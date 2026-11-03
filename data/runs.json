@@ -4,5 +4,11 @@
     "note": "테스트 실행. 지멘스 Node-RED 신규 악용, BeyondTrust Metasploit 공개, Ivanti 체인 정리.",
     "count": 9,
     "deepDive": null
+  },
+  {
+    "date": "2026-11-04",
+    "note": "WordPress 업데이트 창 레이스 KEV 등재, Barracuda ESG 체인, Chrome 157 안정 채널, macOS revisiond PoC 공개.",
+    "count": 6,
+    "deepDive": null
   }
 ]
