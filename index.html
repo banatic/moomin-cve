@@ -48,6 +48,9 @@
   .links{font-size:12px;margin-top:6px;display:flex;gap:10px;flex-wrap:wrap}
   .empty{color:var(--mut);text-align:center;padding:40px 0}
   .stats{font-size:12px;color:var(--mut);margin-top:6px}
+  .dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--gry);margin-right:5px;vertical-align:1px}
+  .dot.red{background:var(--red)}.dot.orange{background:var(--org)}.dot.green{background:var(--grn)}
+  .item .dot{align-self:center;margin-right:0}
   .off{display:none;font-size:12px;color:var(--org);margin-top:4px}
 </style>
 </head>
@@ -57,17 +60,18 @@
   <div class="bar"><input type="search" id="q" placeholder="CVE, 제품, 태그 검색"></div>
   <div class="bar" style="margin-top:6px" id="grades">
     <button class="chip on" data-g="all">전체</button>
-    <button class="chip" data-g="red">🔴 즉시 확인</button>
-    <button class="chip" data-g="orange">🟠 주의</button>
-    <button class="chip" data-g="green">🟢 흥미</button>
-    <button class="chip" data-g="gray">⚪ 과장 체크</button>
+    <button class="chip" data-g="red"><span class="dot red"></span>즉시 확인</button>
+    <button class="chip" data-g="orange"><span class="dot orange"></span>주의</button>
+    <button class="chip" data-g="green"><span class="dot green"></span>흥미</button>
+    <button class="chip" data-g="gray"><span class="dot gray"></span>과장 체크</button>
   </div>
   <div class="stats" id="stats"></div>
   <div class="off" id="off">오프라인: 저장된 데이터를 보여주는 중</div>
 </header>
 <main id="list"><div class="empty">불러오는 중…</div></main>
 <script>
-const GL={red:"🔴",orange:"🟠",green:"🟢",gray:"⚪"};
+const GN={red:"즉시 확인",orange:"주의",green:"흥미",gray:"과장 체크"};
+const dot=g=>`<span class="dot ${g}" aria-label="${GN[g]||""}"></span>`;
 const ORD={red:0,orange:1,green:2,gray:3};
 let items=[],runs={},grade="all",q="";
 const $=s=>document.querySelector(s);
@@ -81,7 +85,7 @@ function render(){
     return [it.cve,it.title,it.product,it.summary,(it.tags||[]).join(" ")].join(" ").toLowerCase().includes(q);
   });
   const c={red:0,orange:0,green:0,gray:0};items.forEach(i=>i.grade in c&&c[i.grade]++);
-  $("#stats").textContent=`총 ${items.length}건 · 🔴${c.red} 🟠${c.orange} 🟢${c.green} ⚪${c.gray}`;
+  $("#stats").innerHTML=`총 ${items.length}건 · ${dot("red")}${c.red} ${dot("orange")}${c.orange} ${dot("green")}${c.green} ${dot("gray")}${c.gray}`;
   const byDay={};f.forEach(it=>{(byDay[it.date]=byDay[it.date]||[]).push(it)});
   const days=Object.keys(byDay).sort().reverse();
   if(!days.length){$("#list").innerHTML=`<div class="empty">${items.length?"조건에 맞는 항목이 없어.":"아직 기록이 없어."}</div>`;return;}
@@ -92,7 +96,7 @@ function render(){
       const hist=(it.history||[]).map(h=>`${esc(h.date)}: ${esc(h.note)}`).join(" · ");
       const tags=(it.tags||[]).map(t=>`<button data-tag="${esc(t)}">#${esc(t)}</button>`).join("");
       return `<div class="item ${esc(it.grade)}">
-        <div class="top"><span>${GL[it.grade]||""}</span><span class="id">${esc(it.cve)}</span>
+        <div class="top">${it.grade in GN?dot(it.grade):""}<span class="id">${esc(it.cve)}</span>
           ${it.kev?'<span class="tag kev">KEV</span>':""}${it.poc?'<span class="tag poc">PoC</span>':""}
           ${it.cvss!=null?`<span class="tag">CVSS ${esc(it.cvss)}</span>`:""}
           ${it.deepDive?`<span class="tag">심층 ${esc(it.deepDive)}</span>`:""}</div>

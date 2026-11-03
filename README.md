@@ -21,7 +21,7 @@ data/runs.json         날짜별 실행 기록 배열
 |---|---|---|
 | cve | string | CVE ID |
 | date | string | 처음 기록한 날짜 (KST, YYYY-MM-DD) |
-| grade | "red" \| "orange" \| "green" \| "gray" | 🔴 즉시 확인 / 🟠 주의 / 🟢 흥미 / ⚪ 과장 체크 |
+| grade | "red" \| "orange" \| "green" \| "gray" | 즉시 확인 / 주의 / 흥미 / 과장 체크 |
 | title | string | 짧은 제목 |
 | product | string | 영향 제품 |
 | summary | string | 2~3문장 요약 |
@@ -34,3 +34,7 @@ data/runs.json         날짜별 실행 기록 배열
 | deepDive | string \| null | 심층 설명한 날짜 |
 
 `data/runs.json`: 날짜 오름차순 배열 `{date, note, count, deepDive}`
+
+## 규칙
+
+- 앱 UI와 data/*.json 어디에도 이모지를 쓰지 않는다. 등급은 색 점(CSS)과 텍스트로 표시한다.
