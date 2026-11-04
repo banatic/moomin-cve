@@ -100,6 +100,132 @@
     "deepDive": null
   },
   {
+    "cve": "CVE-2026-109518",
+    "date": "2026-11-05",
+    "grade": "orange",
+    "title": "APT 재시도 중 하드링크 재사용으로 검증 후 패키지 교체",
+    "product": "APT (Debian 12 이상, Ubuntu 22.04 이상 기본 노출)",
+    "summary": "HTTP 경로를 조작할 수 있는 공격자가 리다이렉트와 일시 오류로 재시도를 유도해, 검증을 통과한 패키지 파일을 다른 내용으로 바꿔 root 코드 실행까지 가는 TOCTOU야. 11/4 공개, Debian과 Ubuntu 패치 배포됨. 실제 악용 보고는 없고 Feedly의 APT3 악용 표기는 패키지 관리자 이름을 공격 그룹으로 오인한 것으로 보여 (추정).",
+    "cvss": null,
+    "kev": false,
+    "poc": false,
+    "tags": [
+      "linux",
+      "apt",
+      "supply-chain",
+      "toctou",
+      "mitm"
+    ],
+    "links": [
+      {
+        "label": "Debian DSA-6607-1",
+        "url": "https://lists.debian.org/debian-security-announce/2026/msg00526.html"
+      },
+      {
+        "label": "Ubuntu CVE 페이지",
+        "url": "https://ubuntu.com/security/CVE-2026-109518"
+      },
+      {
+        "label": "APT 개발자 공지",
+        "url": "https://lists.debian.org/deity/2026/11/msg00005.html"
+      },
+      {
+        "label": "The Hacker News",
+        "url": "https://thehackernews.com/2026/11/debian-and-ubuntu-apt-flaw-lets-mitm.html"
+      },
+      {
+        "label": "Linuxiac APT 3.3.6",
+        "url": "https://linuxiac.com/apt-3-3-6-released-with-security-fix-for-download-verification-bypass/"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-109518"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "CVE 설명 기준 원인은 하드링크 재사용이고 CWE-62(UNIX Hard Link), CWE-367(TOCTOU)로 분류돼. 보도들은 리다이렉트 뒤 서로 다른 두 패키지 다운로드가 같은 URI로 합쳐질 수 있고, 재시도나 이어받기 중 파일이 섞인다고 설명해. 깨진 불변식은 '검증을 통과한 디스크상의 파일은 설치 때까지 그대로다'야. 서명 검사 자체가 뚫린 게 아니라 검증과 사용 사이에 같은 inode로 쓰기가 들어오는 구조로 보여 (추정). 함수 단위 설명은 DSA와 APT 공지가 스크래핑 차단이라 직접 못 봤어.",
+      "trigger": "APT와 아카이브 사이 HTTP 트래픽을 조작할 수 있는 온패스 위치 (악성 미러, 프록시 포함). 클라이언트가 리다이렉트를 따르고 다운로드를 재시도해야 하고, Acquire::Retries가 0이 아니어야 해. 기본값 3은 Debian 12, Ubuntu 22.04부터라 그 이전은 기본 설정으로 비노출이야. 설치 시점에 사람이 apt를 돌리거나 자동 업데이트가 돌아야 해. HTTPS 소스의 노출 여부는 권고들이 명시하지 않았어.",
+      "exploitation": "개념 흐름: 리다이렉트로 다운로드 식별자 충돌, 일시 오류로 재시도, 재사용된 하드링크를 통해 검증된 파일 내용 교체, dpkg가 교체본을 root로 설치. 실제 악용 보고 없음. OffSeq는 GitHub 공개 PoC가 있다고 적었지만 저장소를 직접 확인하지 못해서 poc는 false로 뒀어.",
+      "patch": "다운로드 메서드가 대상 파일을 배타적으로 열도록 변경 (3.3.6 릴리스 설명). upstream 수정선은 3.3.6, 3.2.1, 3.0.4, 2.8.4, 2.6.2, 2.4.15, 2.2.5, 2.0.12 등. Ubuntu는 3.3.3ubuntu0.1(26.10), 3.2.1ubuntu0.1(26.04), 2.8.4ubuntu0.1(24.04), 2.4.15ubuntu0.1(22.04). 공식 우회책은 없고, Acquire::Retries 값을 0으로 두면 CVE 전제 조건은 빠지지만 벤더 완화책으로 제시된 건 아니야 (추정).",
+      "detection": "공개 IoC 없음. apt-config dump 로 Retries 값, /var/log/apt/history.log 와 dpkg.log 로 설치 내역을 확인해. 설치된 파일과 패키지 해시가 다르면 debsums로 볼 수 있지만 교체된 패키지 자체의 메타데이터와 일치하면 못 잡아 (추정). 미러 접속 로그에서 패키지 URL의 비정상 리다이렉트와 5xx 후 재시도가 함께 나오면 조사 대상이야.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "취약 패턴 (재구성, 실제 소스 아님, 추정)",
+          "lang": "C++",
+          "code": "// 재시도 때 기존 대상 파일을 그대로 열어 씀\nlink(verified_path, dest_path);          // 같은 inode 재사용\nint fd = open(dest_path, O_WRONLY | O_CREAT, 0600);\n// fd로 쓰면 이미 검증된 파일 내용까지 바뀜\nwrite(fd, body, len);"
+        },
+        {
+          "kind": "fix",
+          "label": "수정 방향 (3.3.6 릴리스 설명 기반 재구성, 실제 소스 아님)",
+          "lang": "C++",
+          "code": "// 기존 경로를 재사용하지 않고 새 파일만 생성\nint fd = open(dest_path, O_WRONLY | O_CREAT | O_EXCL, 0600);\nif (fd < 0) return fail();  // 충돌이면 쓰지 않음"
+        }
+      ]
+    },
+    "deepDive": null
+  },
+  {
+    "cve": "CVE-2026-109593",
+    "date": "2026-11-05",
+    "grade": "orange",
+    "title": "SonicWall GMS 무인증 파일 읽기, 패치 없음 (EoL)",
+    "product": "SonicWall GMS 9.5.2 이하 (Windows, Linux)",
+    "summary": "네트워크 접근만 있으면 인증 없이 GMS 내부 파일을 읽을 수 있고, 같이 공개된 CVE-2026-109594(6.8)는 인증 후 SQL 인젝션이야. 제품이 EoL이라 패치는 안 나오고 SonicWall은 NSM 이전을 권고해. 악용 보고나 PoC는 확인 못 했어.",
+    "cvss": 9.1,
+    "kev": false,
+    "poc": false,
+    "tags": [
+      "sonicwall",
+      "gms",
+      "eol",
+      "file-read",
+      "sqli"
+    ],
+    "links": [
+      {
+        "label": "SonicWall SNWLID-2026-0019",
+        "url": "https://psirt.global.sonicwall.com/vuln-detail/SNWLID-2026-0019"
+      },
+      {
+        "label": "The Hacker News",
+        "url": "https://thehackernews.com/2026/11/sonicwall-wont-patch-eol-gms-flaws-that.html"
+      },
+      {
+        "label": "CVE 레코드",
+        "url": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/109xxx/CVE-2026-109593.json"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-109593"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "CVE 레코드의 분류는 CWE-636(Not Failing Securely)이야. 인증이나 접근 판단이 실패할 때 거부로 닫히지 않아 내부 파일 응답까지 가는 구조로 보여 (추정). 어느 엔드포인트, 어떤 파일까지 읽히는지는 공개된 세부가 없어. CVSS 벡터에 A:H가 들어 있는 이유도 설명되지 않았어.",
+      "trigger": "GMS에 네트워크로 닿는 무인증 공격자. 사용자 상호작용 없음. CVE-2026-109594는 특정 조건의 인증 사용자 필요.",
+      "exploitation": "프리미티브는 내부 파일 읽기이고, 설정이나 자격 증명이 파일에 있으면 인증 후 SQL 인젝션 쪽으로 이어질 수 있어 (추정, 체인은 공개되지 않음). 실제 악용과 PoC 모두 보고 없음.",
+      "patch": "패치 없음. 9.5.2 이하가 EoL이라 NSM 이전이 벤더 권고야. 이전 전까지는 관리 인터페이스를 인터넷에서 빼고 관리망으로 제한해 (벤더 권고 원문은 직접 확인 못 함).",
+      "detection": "공개 IoC 없음. GMS 웹 로그에서 미인증 세션의 내부 파일성 응답, 비정상 크기의 200 응답을 봐. Windows 설치본이면 Sysmon 3(네트워크), 11(파일 생성)로 후속 행위를 볼 수 있어 (추정).",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "Fail-open 패턴 (재구성, 실제 소스 아님, 추정)",
+          "lang": "Java",
+          "code": "try {\n    checkSession(req);\n} catch (AuthException e) {\n    log(e);  // 거부하지 않고 계속 진행\n}\nreturn readInternalFile(req.getParameter(\"name\"));"
+        },
+        {
+          "kind": "fix",
+          "label": "Fail-closed 방향 (재구성, 실제 소스 아님, 추정)",
+          "lang": "Java",
+          "code": "if (!isAuthenticated(req)) {\n    return forbidden();  // 판단 실패는 항상 거부\n}\nreturn readAllowlistedFile(req.getParameter(\"name\"));"
+        }
+      ]
+    },
+    "deepDive": null
+  },
+  {
     "cve": "CVE-2026-111357",
     "date": "2026-11-02",
     "grade": "red",
@@ -600,6 +726,120 @@
     "deepDive": null
   },
   {
+    "cve": "CVE-2026-122266",
+    "date": "2026-11-05",
+    "grade": "green",
+    "title": "EKS Network Policy Agent eBPF conntrack 맵 오염",
+    "product": "aws-network-policy-agent 1.3.7 미만, VPC CNI 1.22.3 미만",
+    "summary": "같은 노드의 인증된 사용자가 AF_PACKET 프레임으로 eBPF conntrack 맵을 오염시켜 파드 NetworkPolicy 인그레스를 우회할 수 있어. eBPF 상태 맵이 신뢰 경계를 넘는 사례라 연구 관점에서 볼 만해. PoC와 악용 보고는 없어.",
+    "cvss": 8.7,
+    "kev": false,
+    "poc": false,
+    "tags": [
+      "aws",
+      "eks",
+      "ebpf",
+      "kubernetes",
+      "research"
+    ],
+    "links": [
+      {
+        "label": "TheHackerWire",
+        "url": "https://www.thehackerwire.com/vulnerability/CVE-2026-122266/"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-122266"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "CWE-1189(공유 자원의 부적절한 격리). 공격 트래픽으로 만든 AF_PACKET 프레임이 eBPF conntrack 맵에 항목을 남기고, 정책 판단이 그 항목을 허용된 기존 흐름으로 믿는 구조로 설명돼. 맵 키나 BPF 프로그램 이름 등 코드 세부는 AWS 공지를 직접 못 봐서 확인 못 했어.",
+      "trigger": "인접 위치의 인증된 사용자 (AV:A, PR:L), 같은 노드에서 AF_PACKET 프레임을 만들 수 있어야 해.",
+      "exploitation": "conntrack 맵 오염, 인그레스 정책 판단 우회, 같은 노드 파드 접근까지가 공개된 흐름이야. 실제 악용과 PoC 보고 없음.",
+      "patch": "Amazon VPC CNI Managed Add-on 1.22.3 이상 (Network Policy Agent 1.3.7 포함). AWS 공지 2026-170-aws, GHSA-mm5f-ggvx-hmvw.",
+      "detection": "공개된 탐지 지표 없음.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "취약 패턴 (재구성, 실제 소스 아님, 추정)",
+          "lang": "C",
+          "code": "/* 신뢰되지 않은 프레임도 같은 맵에 항목 생성 */\nbpf_map_update_elem(&conntrack, &key, &allow, BPF_ANY);\n/* 인그레스 판단이 맵 항목만 믿음 */\nif (bpf_map_lookup_elem(&conntrack, &key)) return TC_ACT_OK;"
+        },
+        {
+          "kind": "fix",
+          "label": "수정 방향 (재구성, 실제 소스 아님, 추정)",
+          "lang": "C",
+          "code": "/* 정책 판정을 통과한 흐름만 기록 */\nif (policy_allows(&key))\n    bpf_map_update_elem(&conntrack, &key, &allow, BPF_NOEXIST);"
+        }
+      ]
+    },
+    "deepDive": null
+  },
+  {
+    "cve": "CVE-2026-13684",
+    "date": "2026-11-05",
+    "grade": "red",
+    "title": "Synology DSM SCGI 결함, C3RB3R 랜섬웨어 침입 경로로 지목",
+    "product": "Synology DSM 7.2.1 ~ 7.4",
+    "summary": "구버전 DSM NAS를 노린 C3RB3R 랜섬웨어(.L0CK3D)가 실제로 돌고 있고 KISA도 11/3 주의 권고를 냈어. 다만 침입 경로는 엇갈려: 360은 이 CVE와 CVE-2026-13639(9월 패치)를, Synology는 2024년 SA-24:20 쪽을 가리켜. CISA KEV에는 없어.",
+    "cvss": 9.8,
+    "kev": false,
+    "poc": false,
+    "tags": [
+      "synology",
+      "nas",
+      "ransomware",
+      "in-the-wild",
+      "school"
+    ],
+    "links": [
+      {
+        "label": "Synology-SA-26:13",
+        "url": "https://www.synology.com/en-uk/support/security/Synology_SA_26_13"
+      },
+      {
+        "label": "The Hacker News",
+        "url": "https://thehackernews.com/2026/11/synology-nas-devices-targeted-in.html"
+      },
+      {
+        "label": "Gridinsoft 출처 비교",
+        "url": "https://blog.gridinsoft.com/synology-c3rb3r-ransomware-nas-backups/"
+      },
+      {
+        "label": "KISA 보안공지 목록",
+        "url": "https://www.boho.or.kr/kr/bbs/list.do?menuNo=205020&bbsId=B0000133"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-13684"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "Synology 권고에 따르면 CVE-2026-13684는 SCGI의 출력 인코딩 또는 이스케이프 미흡이고, 원격 공격자가 임의 파일 읽기, 쓰기, DoS를 할 수 있어. CVE-2026-13639는 로그인 로직의 엔트로피 부족이고 영향은 같아. 어떤 필드가 어떤 하위 프로세스나 경로로 이스케이프 없이 넘어가는지는 공개된 세부가 없어.",
+      "trigger": "원격 무인증 (권고 기준, CVSS 9.8). DSM이 인터넷에 직접 노출된 장비가 우선 대상이야. 어떤 CVE가 실제 초기 침입에 쓰였는지는 공개 자료로 확정 못 해.",
+      "exploitation": "랜섬웨어 공격 자체는 실제 악용 확인. Synology는 10/29 공지에서 2024년 12월에 패치된 취약점(SA-24:20)을 들고 CVE는 특정하지 않았고, 360은 같은 날 CVE-2026-13684, CVE-2026-13639를 지목했어. 두 보고가 같은 피해 집단을 본 건지는 확인되지 않아. 암호화는 파일별 키와 nonce, ChaCha8, RSA-2048 보호 구조로 보고됐어.",
+      "patch": "SA-26:13 최소 수정 버전은 DSM 7.4-90075, 7.3.2-86009-4, 7.2.2-72806-9, 7.2.1-69057-12야. 패치는 침입만 막고 이미 암호화된 파일은 못 살려. 임시로 DSM 직접 노출을 끊고 VPN 뒤로 옮겨. 같은 NAS에 붙은 백업은 백업으로 치지 마.",
+      "detection": "확장자 .L0CK3D (숫자 0), 폴더마다 read-me3.txt. 공개 기사에는 해시, IP, 도메인이 없고 원문 360 보고서는 직접 확인 못 했어. 감염 시 Synology는 네트워크 분리를 먼저 하고, 분리가 불가능할 때만 전원을 끄라고 안내해 (휘발성 증거 보존).",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "취약 패턴 (재구성, 실제 소스 아님, 추정)",
+          "lang": "C",
+          "code": "// SCGI 헤더 값이 경로나 명령 문맥에 그대로 들어감 (추정)\nconst char *v = scgi_get(req, \"SOME_HEADER\");\nsnprintf(buf, sizeof(buf), TEMPLATE, v);  // 이스케이프 없음\nuse_as_path_or_cmd(buf);"
+        },
+        {
+          "kind": "fix",
+          "label": "수정 방향 (재구성, 실제 소스 아님, 추정)",
+          "lang": "C",
+          "code": "// 출력 문맥에 맞춰 검증, 이스케이프\nif (!is_safe_value(v)) return HTTP_400;\nescape_for_context(out, sizeof(out), v);"
+        }
+      ]
+    },
+    "deepDive": null
+  },
+  {
     "cve": "CVE-2026-58115",
     "date": "2026-11-02",
     "grade": "red",
@@ -653,7 +893,7 @@
     "grade": "orange",
     "title": "Android Framework 제로클릭 RCE",
     "product": "Android 14~17",
-    "summary": "11월 불레틴의 최고 심각도 항목으로 추가 권한이나 사용자 상호작용 없이 RCE가 가능해. 같이 묶인 CVE-2026-58936은 Android 자체 코드가 아니라 서드파티 libpng의 use-after-free야. 패치 레벨 2026-11-05 이상 권장, 악용 보고는 없어.",
+    "summary": "11월 불레틴의 최고 심각도 항목으로 추가 권한이나 사용자 상호작용 없이 RCE가 가능해. 같이 묶인 CVE-2026-58936은 Android 자체 코드가 아니라 서드파티 libpng의 use-after-free야. 패치 레벨 2026-11-01 이상이면 수정되고(전체는 11-05), Play 시스템 업데이트로는 안 고쳐져. 악용 보고는 없어.",
     "cvss": null,
     "kev": false,
     "poc": false,
@@ -672,11 +912,16 @@
         "url": "https://securityonline.info/android-security-update-november-2026/"
       }
     ],
-    "history": [],
+    "history": [
+      {
+        "date": "2026-11-05",
+        "note": "수정 패치 레벨을 2026-11-01로 정정, Play 시스템 업데이트에 미포함 확인. SSVC Exploitation none."
+      }
+    ],
     "detail": {
       "rootCause": "미디어 프레임 디코더(FrameDecoder.cpp)의 onOutputReceived가 코덱이 돌려준 출력 버퍼를 미리 할당한 프레임 버퍼로 복사할 때, 복사 길이와 대상 버퍼의 남은 용량을 맞춰보지 않아 힙 범위 밖 쓰기가 나 (CWE-787). 썸네일 추출처럼 사용자 조작 없이 미디어를 디코딩하는 경로에서 호출되기 때문에 제로클릭이 돼. AOSP 커밋을 직접 확인하지 못해서 아래 코드는 CVE 설명에서 재구성한 거야.",
       "trigger": "추가 권한이나 사용자 상호작용 없이 원격 트리거 가능.",
-      "patch": "보안 패치 레벨 2026-11-05 이상.",
+      "patch": "보안 패치 레벨 2026-11-01 이상이면 이 CVE는 수정돼. 11-05는 커널과 공급업체 구성요소까지 포함한 전체 레벨이야. Google Play 시스템 업데이트에는 이 CVE가 포함되지 않아. AOSP 커밋은 아직 확인 못 했어.",
       "code": [
         {
           "kind": "vuln",
@@ -689,6 +934,69 @@
           "label": "수정 방향 (재구성, 실제 소스 아님, 추정)",
           "lang": "C++",
           "code": "if (offset > frame->capacity() ||\n    out->size() > frame->capacity() - offset) {\n    return ERROR_MALFORMED;  // 남은 용량 검사\n}"
+        }
+      ]
+    },
+    "deepDive": null
+  },
+  {
+    "cve": "CVE-2026-58882",
+    "date": "2026-11-05",
+    "grade": "orange",
+    "title": "Android SMS of Death, WAP Push 길이 캐스팅으로 전화 프로세스 크래시",
+    "product": "Android telephony (Android 12~17 재현 보고, 패치는 14~17)",
+    "summary": "보이지 않는 데이터 SMS 하나로 com.android.phone이 죽어 긴급 통화까지 끊기는 제로클릭 DoS야. 연구자가 소스와 PoC 앱을 공개했고, 11월 불레틴에 CVE가 올라왔어. Android 12, 13은 같은 코드인데 패치 대상이 아니야.",
+    "cvss": null,
+    "kev": false,
+    "poc": true,
+    "tags": [
+      "android",
+      "telephony",
+      "dos",
+      "zero-click",
+      "school"
+    ],
+    "links": [
+      {
+        "label": "SMS of Death 원문",
+        "url": "https://smsofdeath.com/"
+      },
+      {
+        "label": "Android 불레틴 2026-11",
+        "url": "https://source.android.com/docs/security/bulletin/2026/2026-11-01"
+      },
+      {
+        "label": "GitHub 연구자 저장소",
+        "url": "https://github.com/MarkBlah/smsofdeath"
+      },
+      {
+        "label": "eSecurity Planet",
+        "url": "https://www.esecurityplanet.com/threats/news-android-sms-of-death-cve-2026-58882/"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-58882"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "frameworks/opt/telephony의 WapPushOverSms.decodeWapPdu()가 WSP 헤더 길이를 uintvar로 읽어 long으로 받고, 범위 검사 없이 int로 캐스팅해 바이트 배열 크기로 써. 캐스팅 결과가 음수면 NegativeArraySizeException이 나는데 기존 catch는 ArrayIndexOutOfBoundsException만 잡아서 telephony 메인 스레드까지 전파돼. 깨진 불변식은 '헤더 길이는 PDU 안에 들어가는 양의 값'이야. 메모리 손상은 없고 관리되는 런타임의 미처리 예외야. 문제 메시지가 raw 테이블에 남아 재처리되면 크래시가 반복돼.",
+      "trigger": "원격, 전화번호만 알면 되고 사용자 상호작용 없음. 메시지는 받은편지함에 안 보여. 통신사 경로의 필터링 여부에 따라 도달성은 달라질 수 있어 (추정).",
+      "exploitation": "프리미티브는 DoS뿐이야: 캐스팅, 음수 크기, 미처리 예외, 프로세스 종료. 코드 실행으로 이어진다는 보고는 없어. 큐에 남은 메시지가 재부팅 뒤 재처리되며 부팅 루프가 되고 RescueParty까지 갈 수 있다고 보고됐어. 공격 사례 보고 없음.",
+      "patch": "커밋 735d967(Fix remote DoS in decodeWapPdu)은 길이 검증 대신 catch를 RuntimeException으로 넓히고, InboundSmsHandler에서 실패한 메시지를 raw 테이블에서 지워. 입력 검증이 아니라 증상 처리라 다른 런타임 오류까지 묻힐 수 있어 (추정). 연구자는 10월 패치 포함이라 하고 11월 불레틴은 2026-11-01 레벨에 CVE를 올렸으니, 패치 레벨 11-01 이상으로 확인하는 게 안전해. Android 12, 13은 수정 없음.",
+      "detection": "logcat의 FATAL EXCEPTION: main, 프로세스 com.android.phone, NegativeArraySizeException, 스택 상단 WapPushOverSms.decodeWapPdu. 통화 끊김 DisconnectCause CS_DEATH, com.android.phone 반복 재시작. content://sms/raw에 남은 WAP Push 행이 재크래시 원인이야.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "WapPushOverSms.java (연구자 글 발췌, AOSP 직접 대조 안 함)",
+          "lang": "Java",
+          "code": "// 217행: long을 범위 검사 없이 int로 축소\nint headerLength = (int) pduDecoder.getValue32();\n// 244행: 음수면 NegativeArraySizeException\nbyte[] header = new byte[headerLength];"
+        },
+        {
+          "kind": "fix",
+          "label": "커밋 735d967 설명 기반 (재구성, 실제 소스 아님)",
+          "lang": "Java",
+          "code": "} catch (RuntimeException e) {  // 기존 AIOOBE에서 확대\n    return null;                // 디코딩 실패로 처리\n}\n// InboundSmsHandler: 실패 메시지는 raw 테이블에서 삭제해 재처리 차단"
         }
       ]
     },
@@ -731,6 +1039,78 @@
       "rootCause": "인터넷에서 받은 파일의 Mark of the Web 경고를 건너뛰게 하는 보안 기능 우회. MS는 CWE-77로 분류, 세부 메커니즘은 미공개.",
       "trigger": "사용자가 파일을 열어야 해.",
       "patch": "10월 누적 업데이트. Edge는 154.0.4258.62 이상."
+    },
+    "deepDive": null
+  },
+  {
+    "cve": "CVE-2026-98432",
+    "date": "2026-11-05",
+    "grade": "orange",
+    "title": "Linux IPv4 TCP IP 옵션 RCU 위반 UAF",
+    "product": "Linux 커널 4.4 이후 IPv4 TCP",
+    "summary": "핸드셰이크에서 IP 옵션 객체를 복사 없이 넘기고 kfree로 바로 해제해, 재전송 SYN을 처리하는 다른 CPU가 해제된 메모리를 읽는 pre-auth UAF야. KISA가 11/3 권고를 냈고 Red Hat은 패치 완료, Ubuntu LTS는 아직 proposed야. MPTCP 리스너 연구실 환경의 root 익스플로잇이 보고됐지만 코드는 비공개고 실제 악용 보고는 없어.",
+    "cvss": 9.8,
+    "kev": false,
+    "poc": true,
+    "tags": [
+      "linux",
+      "kernel",
+      "tcp",
+      "uaf",
+      "race",
+      "rcu"
+    ],
+    "links": [
+      {
+        "label": "Ubuntu CVE 페이지",
+        "url": "https://ubuntu.com/security/CVE-2026-98432"
+      },
+      {
+        "label": "linux-cve-announce",
+        "url": "https://lists.openwall.net/linux-cve-announce/2026/10/15/1"
+      },
+      {
+        "label": "The Hacker News",
+        "url": "https://thehackernews.com/2026/11/red-hat-patches-98-rated-linux-tcp-rce.html"
+      },
+      {
+        "label": "Upwind 분석",
+        "url": "https://www.upwind.io/feed/cve-2026-98432-inside-the-critical-linux-tcp-use-after-free-that-fires-before-your-app-sees-a-byte"
+      },
+      {
+        "label": "Penligent 정리",
+        "url": "https://penligent.ai/hackinglabs/cve-2026-98432"
+      },
+      {
+        "label": "SecurityOnline Ubuntu 상태",
+        "url": "https://securityonline.info/cve-2026-98432-ubuntu-proposed-fix/"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-98432"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "tcp_v4_syn_recv_sock()가 request socket의 ireq_opt를 복제 없이 child의 inet_opt로 넘겨. 재전송 SYN을 처리하는 다른 CPU는 tcp_check_req()에서 tcp_v4_send_synack(), ip_build_and_send_pkt(), ip_options_build()로 같은 객체를 읽어. 읽는 쪽은 RCU 읽기 구간인데 inet_sock_destruct()와 tcp_v4_reqsk_destructor()는 유예 기간 없이 kfree()로 해제해. 즉 RCU 게시 객체는 grace period 뒤에 해제한다는 불변식이 깨진 use-after-free야 (CWE-416). net.ipv4.tcp_migrate_req=1이나 reuseport BPF 마이그레이션이 있으면 두 request가 옵션을 공유하는 변형도 있어. 도입 관련 커밋은 079096f103fa로 지목돼.",
+      "trigger": "원격 무인증, 도달 가능한 IPv4 TCP 리스너. Record Route나 Timestamp 같은 IP 옵션이 있는 SYN과 재전송 타이밍 경쟁이 필요해. 경쟁에서 지면 핸드셰이크만 실패해서 재시도할 수 있어. IPv6 주 경로는 옵션을 복제해서 해당 없음.",
+      "exploitation": "프리미티브는 해제된 옵션 객체의 읽기이고, CNA는 원격 메모리 유출, 메모리 손상, 크래시를 들어. 공개 연구 구성은 MPTCP 리스너 대상이고, 포인터 유출 약 48분 뒤 명령 실행 약 5분으로 보고된 단일 실험이야. Anthropic이 자사 모델로 작성했다고 10/27 발표했고 코드는 비공개야. GitHub 공개 코드는 경쟁 유발과 탐지만 하고 코드 실행 기능은 없어. 실제 악용 보고 없고 KEV 미등재야.",
+      "patch": "커밋 e3f33b0a1d89 (ipv4: free inet_opt and ireq_opt after an RCU grace period)가 두 kfree를 kfree_rcu로 바꿔. 안정 수정선은 5.10.272, 5.15.223, 6.1.190, 6.6.159, 6.12.113, 6.18.56, 7.2.10. RHEL은 11/1 RHSA-2026:93412~93414, 재부팅 필요. Ubuntu는 22.04, 24.04, 26.04가 proposed, 16.04~20.04 대기. 26.10은 SecurityOnline이 수정 완료로, Ubuntu 페이지는 작업 중으로 적어 엇갈려. 임시로 IP 옵션 있는 IPv4 TCP 드롭, 안 쓰면 net.mptcp.enabled=0. 다만 완전한 방어는 아니고 같은 호스트의 컨테이너 간 트래픽은 비켜갈 수 있어.",
+      "detection": "IP 옵션이 있는 인바운드 SYN(IHL이 5보다 큼)은 정상 트래픽에서 드물어. 같은 출발지의 옵션 포함 SYN과 핸드셰이크 실패 반복, TCP 경로의 oops나 KASAN 경고, 서비스 맥락 없는 root 프로세스가 지표야.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "수명 불일치 (패치 설명 기반 재구성, 실제 소스 아님)",
+          "lang": "C",
+          "code": "/* tcp_v4_syn_recv_sock: 복제 없이 소유권 이동 */\nRCU_INIT_POINTER(newinet->inet_opt, ireq_opt);\n\n/* 소멸자: RCU 독자가 남아 있어도 즉시 해제 */\nkfree(rcu_dereference_protected(inet->inet_opt, 1));"
+        },
+        {
+          "kind": "fix",
+          "label": "커밋 e3f33b0 방향 (설명 기반 재구성, 실제 소스 아님)",
+          "lang": "C",
+          "code": "struct ip_options_rcu *opt =\n    rcu_dereference_protected(inet->inet_opt, 1);\nif (opt)\n    kfree_rcu(opt, rcu);  /* grace period 뒤 해제 */"
+        }
+      ]
     },
     "deepDive": null
   }

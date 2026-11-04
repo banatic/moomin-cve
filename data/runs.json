@@ -10,5 +10,11 @@
     "note": "WordPress 업데이트 창 레이스 KEV 등재, Barracuda ESG 체인, Chrome 157 안정 채널, macOS revisiond PoC 공개.",
     "count": 6,
     "deepDive": null
+  },
+  {
+    "date": "2026-11-05",
+    "note": "Synology C3RB3R 랜섬웨어 침입 경로 논란, APT 하드링크 TOCTOU, SonicWall GMS EoL 무패치, Android SMS of Death, Linux TCP RCU UAF.",
+    "count": 6,
+    "deepDive": null
   }
 ]
