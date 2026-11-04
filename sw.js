@@ -1,5 +1,5 @@
 // 앱 셸은 캐시 우선, 데이터(JSON)는 네트워크 우선 + 오프라인 시 캐시
-const SHELL = "moomin-cve-shell-v4";
+const SHELL = "moomin-cve-shell-v5";
 const DATA = "moomin-cve-data";
 const SHELL_FILES = ["./", "index.html", "manifest.webmanifest", "icons/icon.svg", "icons/icon-192.png", "icons/icon-512.png"];
 
