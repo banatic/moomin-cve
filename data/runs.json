@@ -16,5 +16,11 @@
     "note": "Synology C3RB3R 랜섬웨어 침입 경로 논란, APT 하드링크 TOCTOU, SonicWall GMS EoL 무패치, Android SMS of Death, Linux TCP RCU UAF.",
     "count": 6,
     "deepDive": null
+  },
+  {
+    "date": "2026-11-06",
+    "note": "Apple PAC 우회 KEV 등재, Zyxel GS1900 패치 우회 제로데이, Sogou 입력기 하이재킹, OpenSSH musl 인증 우회, Rails ImageMagick, Xen grant copy, FreeRDP, Paint 과장 점검.",
+    "count": 10,
+    "deepDive": null
   }
 ]

@@ -1,5 +1,178 @@
 [
   {
+    "cve": "CVE-2024-27834",
+    "date": "2026-11-06",
+    "grade": "red",
+    "title": "Apple PAC 우회, 2년 뒤 APT29 워터링홀에서 KEV 등재",
+    "product": "Safari, iOS, iPadOS, macOS, tvOS, watchOS",
+    "summary": "2024년 Pwn2Own 때 나온 WebKit의 Pointer Authentication 우회가 2026-11-04 CISA KEV에 들어갔다. Sekoia가 보고한 APT29 연계 Poisoned Source 캠페인이 iOS 16.7 체인에서 쿠키 탈취에 썼다. 패치는 2024년 5월에 나왔고 최신 기기는 영향이 없다.",
+    "cvss": 5.5,
+    "kev": true,
+    "poc": false,
+    "tags": [
+      "iOS",
+      "Safari",
+      "WebKit",
+      "PAC",
+      "KEV",
+      "watering hole",
+      "APT29"
+    ],
+    "links": [
+      {
+        "label": "The Hacker News (KEV 등재)",
+        "url": "https://thehackernews.com/2026/11/hackers-exploit-patched-apple-flaw-to.html"
+      },
+      {
+        "label": "Sekoia Poisoned Source 보고서",
+        "url": "https://www.sekoia.com/blog/poisoned-source-apt29-watering-holes-targets-mobile-devices-with-n-day-exploits"
+      },
+      {
+        "label": "THN Poisoned Source 정리",
+        "url": "https://thehackernews.com/2026/11/apt29-linked-hackers-hijack-web.html"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2024-27834"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "WebKit에서 Pointer Authentication(PAC) 보호가 깨지는 결함으로, Apple 설명은 임의 읽기 쓰기 능력을 이미 가진 공격자가 PAC를 우회할 수 있다는 것뿐이다. CWE는 부적절한 인증으로 분류돼 있다. arm64e의 PAC는 포인터 상위 비트에 서명을 넣고 사용 시 검증해서 메모리 쓰기가 곧바로 제어 흐름 탈취가 되지 않게 막는 장치인데, 이 불변식이 어느 코드 경로에서 깨졌는지는 공개된 세부가 없다. 그래서 코드 블록은 넣지 않았다. 단독으로는 원격 공격이 안 되고 WebKit 메모리 손상 버그와 묶여야 의미가 있다.",
+      "trigger": "원격, 사용자가 조작된 페이지를 방문하면 동작(보도상 제로클릭 체인). 먼저 WebKit RCE로 임의 읽기 쓰기를 얻어야 한다. 대상은 패치 전 Apple OS, 이번 캠페인에서는 iOS 16.7.",
+      "exploitation": "실제 악용됨. Sekoia 기준 Class A 체인은 iOS 16.7에서 CVE-2025-43529와 CVE-2024-27834를 묶어 JavaScript 기반으로 브라우저 쿠키와 기기 데이터를 빼낸다. 유입 경로는 침해된 정상 사이트, 유사 도메인, 2026-08-27부터 09-03까지 변조된 Plerdy SEO Tracker 스크립트. JS 로더가 기기를 지문 채취해서 플랫폼별 N-day 체인을 준다. 기기 지속성은 확인되지 않았다.",
+      "patch": "iOS, iPadOS 16.7.8과 17.5, macOS Sonoma 14.5, tvOS 17.5, watchOS 10.5, Safari 17.5. Apple 설명은 improved checks뿐이라 패치 내용은 공개된 세부 없음. CISA 연방기관 기한은 2026-11-18.",
+      "detection": "유출 지점 ad.starx-net[.]com:8881/telemetry/v12, 유사 도메인 america250[.]holiday, 변조 스크립트 a.plerdy[.]com/public/js/click/main.js. MDM으로 iOS 16.7, 18.5 기기를 찾는 게 먼저다. 전체 IOC는 Sekoia 보고서 참고(이번 실행에서 원문은 열지 못해 2차 출처 기준)."
+    },
+    "deepDive": null
+  },
+  {
+    "cve": "CVE-2026-102703",
+    "date": "2026-11-06",
+    "grade": "orange",
+    "title": "Xen grant copy 캐시 재사용, 프레임 번호와 grant ref 혼동",
+    "product": "Xen 4.6 이상 (XCP-ng, Qubes OS 포함)",
+    "summary": "grant copy 배치 최적화 캐시의 재사용 조건이 틀려서 grant 참조가 프레임 번호처럼 취급될 수 있다. 악성 게스트가 dom0를 포함한 다른 도메인 메모리를 읽고 쓸 수 있고 완화책은 없다. 패치 후 재부팅이 필요하다.",
+    "cvss": null,
+    "kev": false,
+    "poc": false,
+    "tags": [
+      "Xen",
+      "hypervisor",
+      "VM escape",
+      "grant table",
+      "cache validation"
+    ],
+    "links": [
+      {
+        "label": "Xen XSA-523",
+        "url": "https://xenbits.xen.org/xsa/advisory-523.html"
+      },
+      {
+        "label": "Ostorlab 코드 분석",
+        "url": "https://blog.ostorlab.co/xen-hypervisor-guest-escape-cve-2026-102703.html"
+      },
+      {
+        "label": "Qubes QSB-121",
+        "url": "https://www.qubes-os.org/news/2026/11/03/qsb-121/"
+      },
+      {
+        "label": "The Hacker News",
+        "url": "https://thehackernews.com/2026/11/xen-hypervisor-flaws-let-one-malicious.html"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-102703"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "xen/common/grant_table.c의 grant copy 경로는 같은 페이지를 건드리는 연속 연산 성능을 위해 직전 요소의 검증 결과를 캐시한다. 커밋 d28f42f2703e에서 들어왔고 Xen 4.6부터 존재한다. gnttab_copy_buf_valid()는 다음 요소가 캐시와 같은 대상인지 판단하는데, 캐시 항목의 have_grant 플래그를 grant 참조 경로에서만 확인했다. 그래서 프레임 번호 비교가 캐시된 grant 참조 값과 우연히 일치해도 재사용된다. 캐시 키에 주소 지정 방식이 빠져서 서로 다른 종류의 식별자가 같은 값으로 비교된 타입 혼동이다.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "Ostorlab 글의 원본 발췌 기반, 앞뒤 재구성",
+          "lang": "c",
+          "code": "// gnttab_copy_buf_valid() 패치 전\nif ( p->flags & has_gref )\n    return b->have_grant && p->u.ref == b->ptr.u.ref;\n// 프레임 경로는 have_grant를 안 봄 → gref 캐시가 MFN과 일치 가능\nreturn p->u.gmfn == b->ptr.u.gmfn;"
+        },
+        {
+          "kind": "fix",
+          "label": "XSA-523 패치, Ostorlab 글 발췌",
+          "lang": "c",
+          "code": "// 주소 지정 방식이 다르면 캐시 재사용 금지\nif ( !b->virt || b->have_grant != has_gref )\n    return 0;"
+        }
+      ],
+      "trigger": "게스트 내부의 로컬 공격자, 사용자 상호작용 없음. 필요한 것은 grant table로 GNTTABOP_copy 배치를 낼 수 있는 것뿐이고, Citrix 표현으로는 게스트의 권한 있는 사용자다. Xen 4.6 이상, 게스트 유형과 아키텍처 제한 없음.",
+      "exploitation": "이론상 가능(공개 PoC, 악용 보고 없음). 캐시 혼동으로 이전에 매핑된 버퍼가 다른 대상의 복사에 재사용되어 도메인 간 읽기 쓰기가 된다. dom0 메모리까지 닿으므로 VM 탈출로 이어진다.",
+      "patch": "xsa523-1, xsa523-2 패치(4.17, 4.18은 전용본). 패치 제공은 unstable부터 4.17까지, 4.6부터 4.16은 없음. 알려진 완화책 없음, 하이퍼바이저 교체 후 재부팅 필수. XCP-ng 8.3은 xen-4.17.7-4.2.xcpng8.3, Qubes 4.3은 dom0 4.19.6-3. gnttab_copy_buf_valid()에 have_grant != has_gref 거부를 추가.",
+      "detection": "IOC 없음. 공격은 평범한 grant copy 하이퍼콜이고 피해 도메인에는 흔적이 없다. 패치 전 신뢰할 수 없는 게스트를 돌린 호스트는 테넌트 시크릿 노출 가능성을 전제로 본다."
+    },
+    "deepDive": null
+  },
+  {
+    "cve": "CVE-2026-102704",
+    "date": "2026-11-06",
+    "grade": "orange",
+    "title": "Xen grant copy, DOMID_SELF 검사가 캐시 경로에서 누락",
+    "product": "Xen 4.6 이상 (XCP-ng, Qubes OS 포함)",
+    "summary": "프레임 번호 복사는 호출자 자신의 메모리에만 허용되는데 그 검사가 도메인 잠금 함수에 있어서 캐시 재사용 시 건너뛴다. 악성 게스트가 grant 없이 다른 도메인 메모리를 프레임 번호로 지정할 수 있다. CVE-2026-102703과 같은 XSA-523이다.",
+    "cvss": null,
+    "kev": false,
+    "poc": false,
+    "tags": [
+      "Xen",
+      "hypervisor",
+      "VM escape",
+      "grant table",
+      "authorization"
+    ],
+    "links": [
+      {
+        "label": "Xen XSA-523",
+        "url": "https://xenbits.xen.org/xsa/advisory-523.html"
+      },
+      {
+        "label": "Ostorlab 코드 분석",
+        "url": "https://blog.ostorlab.co/xen-hypervisor-guest-escape-cve-2026-102703.html"
+      },
+      {
+        "label": "Qubes QSB-121",
+        "url": "https://www.qubes-os.org/news/2026/11/03/qsb-121/"
+      },
+      {
+        "label": "The Hacker News",
+        "url": "https://thehackernews.com/2026/11/xen-hypervisor-flaws-let-one-malicious.html"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-102704"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "grant copy에서 grant 참조 없이 프레임 번호로 복사하는 건 DOMID_SELF, 즉 자기 메모리일 때만 허용된다. 이 권한 검사가 gnttab_copy_lock_domain() 안에 있었고, gnttab_copy_one()은 같은 도메인을 연달아 접근하면 잠금을 다시 하지 않는다. 그래서 잠금을 건너뛰는 순간 권한 검사도 같이 건너뛴다. 최적화로 생략될 수 있는 단계에 보안 검사를 넣어 둔 순서 결함이다. 권한 검사 누락으로 분류할 수 있다.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "Ostorlab 글의 원본 발췌 기반, 앞뒤 재구성",
+          "lang": "c",
+          "code": "// gnttab_copy_lock_domain(): 잠금할 때만 실행됨\nif ( domid != DOMID_SELF && !is_gref )\n    return GNTST_permission_denied;\n// gnttab_copy_one(): 같은 도메인이면 위 함수를 건너뜀\nif ( !src->domain || op->source.domid != src->ptr.domid || ... )"
+        },
+        {
+          "kind": "fix",
+          "label": "XSA-523 패치, Ostorlab 글 발췌, 일부 재구성",
+          "lang": "c",
+          "code": "// gnttab_copy_claim_buf(): 캐시를 못 쓸 때 항상 실행되는 곳으로 이동\nif ( has_gref ) { /* grant 획득 */ }\nelse if ( ptr->domid != DOMID_SELF )\n    return GNTST_permission_denied;"
+        }
+      ],
+      "trigger": "게스트 내부의 로컬 공격자, 사용자 상호작용 없음. 필요한 것은 grant table로 GNTTABOP_copy 배치를 낼 수 있는 것뿐이고, Citrix 표현으로는 게스트의 권한 있는 사용자다. Xen 4.6 이상, 게스트 유형과 아키텍처 제한 없음.",
+      "exploitation": "이론상 가능(공개 PoC, 악용 보고 없음). grant 없이 임의 도메인 프레임을 복사 원본이나 대상으로 지정할 수 있어 도메인 간 읽기 쓰기, dom0 침해로 이어진다.",
+      "patch": "xsa523-1, xsa523-2 패치(4.17, 4.18은 전용본). 패치 제공은 unstable부터 4.17까지, 4.6부터 4.16은 없음. 알려진 완화책 없음, 하이퍼바이저 교체 후 재부팅 필수. XCP-ng 8.3은 xen-4.17.7-4.2.xcpng8.3, Qubes 4.3은 dom0 4.19.6-3. 검사를 gnttab_copy_lock_domain()에서 gnttab_copy_claim_buf()로 옮겼다.",
+      "detection": "IOC 없음. 공격은 평범한 grant copy 하이퍼콜이고 피해 도메인에는 흔적이 없다. 패치 전 신뢰할 수 없는 게스트를 돌린 호스트는 테넌트 시크릿 노출 가능성을 전제로 본다."
+    },
+    "deepDive": null
+  },
+  {
     "cve": "CVE-2026-102764",
     "date": "2026-11-02",
     "grade": "red",
@@ -96,6 +269,81 @@
       "rootCause": "스푸핑 기반 인증 우회 (CWE-290). UTA0576 체인의 진입 단계.",
       "trigger": "인터넷에 노출된 Connect Secure, 인증 불필요.",
       "patch": "10/13 패치. 체인의 다른 두 CVE까지 막으려면 25.1.1.3 / 22.8R2.6 필요."
+    },
+    "deepDive": null
+  },
+  {
+    "cve": "CVE-2026-107441",
+    "date": "2026-11-06",
+    "grade": "red",
+    "title": "Zyxel GS1900 사전 인증 RCE, 6월 패치를 그대로 통과",
+    "product": "Zyxel GS1900 스위치 10개 모델",
+    "summary": "dispatcher.cgi의 POST 파서가 고정 배열 슬롯 크기와 개수를 확인하지 않아 전역 카운터가 덮인다. Binarly는 약 1000대가 털린 8월 공격이 KEV에 오른 CVE-2026-7273가 아니라 이 버그였고 6월 패치(Patch 2)로 막히지 않았다고 보고했다. Patch 3 펌웨어로 올려야 하며 CISA KEV에는 아직 없다.",
+    "cvss": 8.8,
+    "kev": false,
+    "poc": false,
+    "tags": [
+      "Zyxel",
+      "switch",
+      "pre-auth",
+      "RCE",
+      "patch bypass",
+      "global overflow",
+      "zero-day"
+    ],
+    "links": [
+      {
+        "label": "Binarly 분석",
+        "url": "https://www.binarly.io/blog/zyxel-gs1900-rce-cve-2026-107441"
+      },
+      {
+        "label": "Binarly 권고 BRLY-2026-057",
+        "url": "https://www.binarly.io/advisories/brly-2026-057"
+      },
+      {
+        "label": "Ostorlab 코드 분석",
+        "url": "https://blog.ostorlab.co/zyxel-gs1900-pre-auth-rce-cve-2026-107441.html"
+      },
+      {
+        "label": "The Hacker News",
+        "url": "https://thehackernews.com/2026/11/zyxel-gs1900-patch-fails-to-block-zero.html"
+      },
+      {
+        "label": "SecurityWeek",
+        "url": "https://www.securityweek.com/zyxel-switch-hacks-blamed-on-patched-flaw-actually-exploited-a-zero-day/"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-107441"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "Boa 아래에서 도는 CGI dispatcher.cgi가 HTTP POST 본문을 전역 버퍼 reqParameters에 파싱한다. 이 버퍼는 1024바이트 슬롯 140개짜리고 전역 count가 지금까지 파싱한 필드 수를 센다. 파싱 루프가 필드 길이를 슬롯 크기와 비교하지 않고 count 상한도 없어서, 마지막 슬롯의 긴 필드가 .bss에서 바로 뒤에 있는 count를 덮는다. 즉 쓰기 위치를 결정하는 인덱스가 쓰기 대상과 같은 메모리 영역에 있다는 게 깨진 불변식이다. 스택이 아니라 전역 영역이라는 점에서 6월의 스택 오버플로 진단과 다르다. httprestorecfg.cgi, httpupload.cgi에도 비슷한 코드가 있다고 보도됐다. CWE-787.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "Ostorlab 글의 디컴파일 발췌 기반, 일부 재구성",
+          "lang": "c",
+          "code": "// 전역: char reqParameters[140][1024]; int count;\ndest = &reqParameters[1024 * count]; // count가 곧 쓰기 위치\nmemcpy(dest, src, pos - src);         // 길이 검사 없음, 뒤의 count까지 덮임\n++count;                              // 상한 검사 없음"
+        },
+        {
+          "kind": "vuln",
+          "label": "6월 Patch 2, Ostorlab 글 발췌 (왜 실패했나)",
+          "lang": "c",
+          "code": "memcpy(dest, src, pos - src);     // 먼저 복사, 이미 counter 손상\nif ( ++counter == 140 ) return 0; // 복사 뒤에 검사, 손상된 값은 통과\nif ( counter >= 141 ) counter = 140; // 목적지 계산 뒤라 늦음"
+        },
+        {
+          "kind": "fix",
+          "label": "11월 Patch 3, Ostorlab 글 발췌",
+          "lang": "c",
+          "code": "if ( counter >= 140 ) return;  // 복사 전에 전역 카운터 검사\n// 슬롯 크기 안으로 제한(필드당 511바이트)\nweb_util_paramCopy(&reqParameters[1024 * counter], 512, src, pos - src);"
+        }
+      ],
+      "trigger": "원격, 무인증, 사용자 상호작용 없음. 스위치 웹 관리 서비스에 닿으면 된다. Zyxel은 LAN 기반 공격자(AV:A, 8.8)로, Binarly는 관리 서비스에 도달 가능하면 충분하다고(9.8) 평가했다.",
+      "exploitation": "실제 악용됨(Binarly 보고, Zyxel은 악용을 직접 확인하지 않음). 개념 흐름은 전역 오버플로로 카운터 변조, 부호 있는 곱셈 결과가 음수로 wrap, 버퍼 밖 쓰기로 GOT 항목 덮어쓰기, root 명령 실행이다. GreyNoise 기준 2026-08-17경 48개국 996대에서 설정, root 해시, 네트워크 정보가 유출됐고 그중 564대는 기본 자격증명이었다.",
+      "patch": "펌웨어 2.90(xxx.3)C0, 모델별 접미사가 다르다(GS1900-8 AAHH, GS1900-24 AAHL). 2026-10-22 배포, 권고는 11-03. 복사 전 카운터 검사와 길이 제한 복사로 두 결함을 모두 닫았다. 6월 2.90(xxx.2)C0는 10개 모델 전부 여전히 취약. 공식 우회책은 없고 관리 포트 분리가 임시 완화다. Binarly는 Full RELRO도 권했는데 적용 여부는 권고에 없다.",
+      "detection": "펌웨어가 .3)C0로 끝나는지 인벤토리 확인. Binarly가 JITTERLY 백도어, SIXZUT 루트킷 해시와 YARA를 공개했다. 네트워크 지표는 981666[.]xyz 하위 도메인과 스위치 관리 IP의 TFTP 등 비정상 외부 통신. POST 본문은 로그에 안 남을 수 있어 로그가 깨끗해도 무사하다는 뜻이 아니다. 노출됐던 장비는 관리자 비밀번호, SNMP, RADIUS 시크릿 교체."
     },
     "deepDive": null
   },
@@ -648,6 +896,63 @@
     "deepDive": null
   },
   {
+    "cve": "CVE-2026-120422",
+    "date": "2026-11-06",
+    "grade": "red",
+    "title": "Sogou 입력기 HTTP 설정 하이재킹으로 DarkVigil 설치",
+    "product": "Sogou Input Method for Windows 16.10 미만",
+    "summary": "ESET이 공개한 SlippyNunchucks 캠페인으로, DNS 변조로 SGTool.exe의 평문 HTTP 설정 요청을 가로채 악성 설정을 내려준다. 2026년 7월부터 악용됐고 DLL 사이드로딩으로 .NET 백도어 DarkVigil이 올라간다. 16.10에서 HTTPS와 인증서 피닝을 넣었다.",
+    "cvss": 8.9,
+    "kev": false,
+    "poc": false,
+    "tags": [
+      "Windows",
+      "Sogou",
+      "IME",
+      "update hijack",
+      "DLL sideloading",
+      "DarkVigil",
+      "CWE-1428"
+    ],
+    "links": [
+      {
+        "label": "ESET 보고서",
+        "url": "https://www.welivesecurity.com/en/eset-research/slippynunchucks-hijacks-sogou-input-methods-brand-promotion-mechanism-to-distribute-malware/"
+      },
+      {
+        "label": "The Hacker News",
+        "url": "https://thehackernews.com/2026/11/china-aligned-hackers-hijack-sogou.html"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-120422"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "SGTool.exe는 30개 이상의 명령 ID를 가진 작업 디스패처이고, --appid=scdreg -update 경로가 브랜드 어휘 홍보 설정을 config.pinyin.sogou[.]com에서 평문 HTTP로 받는다. 응답은 AES-256-CBC로 암호화돼 있지만 키와 IV가 바이너리 .rdata에 들어 있어서 인증이 아니라 난독화일 뿐이다. 파일 무결성용 MD5도 같은 설정 안에 있어 공격자가 함께 고칠 수 있다. 다운로드 대상과 저장 경로가 설정 필드로 결정되므로 아이콘 파일 내려받는 기능이 임의 파일 배치로 바뀐다. 네트워크 경로를 신뢰 근거로 삼은 것이 깨진 전제다. CWE-1428.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "재구성, 실제 소스 아님 (ESET 설명 기반)",
+          "lang": "c",
+          "code": "cfg = http_get(\"http://config.pinyin.sogou[.]com/api/brandScd/getBrandScd.php\");\nplain = aes256cbc_dec(cfg, KEY_IN_RDATA, IV_IN_RDATA); // 비밀이 아닌 키\nfile = http_get(plain.icon_url);\nif (md5(file) == plain.md5)      // 해시도 같은 응답에서 옴\n    save(plain.icon_path, file); // 경로까지 응답이 결정"
+        },
+        {
+          "kind": "fix",
+          "label": "재구성, 실제 소스 아님 (16.10 변경 설명 기반)",
+          "lang": "c",
+          "code": "cfg = https_get(url, PINNED_CERT); // HTTPS + 인증서 피닝\n// 설정의 출처를 TLS 신원으로 검증, 이후 처리는 공개된 세부 없음"
+        }
+      ],
+      "trigger": "on-path 또는 DNS 제어 위치의 원격 공격자. 사용자 조작 없이 SGTool.exe 정기 작업으로 동작. DNS 변조 지점은 불명이고 ESET은 침해된 라우터나 ISP 수준 가로채기를 의심한다.",
+      "exploitation": "실제 악용됨. 악성 설정이 정상 서명된 Adobe 바이너리 biz_helper.exe와 악성 libcef.dll을 내려보낸다. Components 아래 SogouComMgr.exe 이름으로 교체하거나 biz_center 버전 폴더에 넣으면 SGTool.exe가 평소대로 실행할 때 사이드로딩된다. 별도 지속성 장치 없이 Sogou 자체 로딩 흐름이 지속성이 된다. 피해국은 홍콩, 태국, 일본, 베트남, 스리랑카, 오만으로 한국은 보고에 없다.",
+      "patch": "16.10(2026-10-29 또는 30, ESET 글 안에서 날짜가 갈림)에서 HTTPS와 인증서 피닝 적용. ESET은 해당 호스트에서 SGTool.exe가 쓰는 평문 HTTP 엔드포인트 20개를 확인했는데 전부 옮겼는지는 공개된 세부 없음.",
+      "detection": "SHA-1: libcef.dll 8A60A8E90E1F5F08F28FE5A6DD57BD686C20DC23, biz_helper.exe 79188C8DE2378B437D39E867475C5B4714A0D7C9. 네트워크: sogou-cdn[.]com, dev.soft-png-cdn[.]com, 47.239.250[.]102, 47.237.122[.]175. 레지스트리 HKCU\\Software\\Microsoft\\IME\\<HWID>\\pluginHash에 플러그인 저장. Sysmon 관점(추정): Event ID 7에서 Sogou Components 경로의 libcef.dll 로드, 1에서 SGTool.exe 자식 SogouComMgr.exe의 서명자가 Adobe, 22에서 DNS 응답 대조. 전체 IOC는 ESET GitHub malware-ioc의 slippynunchucks."
+    },
+    "deepDive": null
+  },
+  {
     "cve": "CVE-2026-121126",
     "date": "2026-11-04",
     "grade": "orange",
@@ -726,6 +1031,180 @@
     "deepDive": null
   },
   {
+    "cve": "CVE-2026-121952",
+    "date": "2026-11-06",
+    "grade": "orange",
+    "title": "FreeRDP 프록시 bitmap cache v2 셀 수 검증 누락",
+    "product": "FreeRDP 3.32.2 미만 (freerdp-proxy)",
+    "summary": "프록시가 Confirm Active의 bitmap cache v2 셀 캐시 개수를 검증하지 않아 범위 밖 쓰기가 난다. 무인증 클라이언트가 원격에서 도달 가능하다고 기재됐다. freerdp-proxy를 쓰는 환경에만 해당한다.",
+    "cvss": 9.8,
+    "kev": false,
+    "poc": false,
+    "tags": [
+      "FreeRDP",
+      "RDP proxy",
+      "heap overflow",
+      "CWE-787"
+    ],
+    "links": [
+      {
+        "label": "FreeRDP 권고 GHSA-xc85-4mqc-xgcx",
+        "url": "https://github.com/FreeRDP/FreeRDP/security/advisories/GHSA-xc85-4mqc-xgcx"
+      },
+      {
+        "label": "CVE Brief 요약",
+        "url": "https://cvebrief.com/cve/cve-2026-121952/"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-121952"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "FreeRDP 프록시가 Confirm Active 메시지의 bitmap cache v2 capability에서 셀 캐시 개수를 검증하지 않고 고정 크기 배열에 쓴다(요약 자료 기준, 권고 원문은 이번 실행에서 확인 못 함). 프로토콜 상한과 구조체 크기 불일치로 추정되는 CWE-787이다. 함수 이름은 공개된 세부를 확인하지 못했다.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "재구성, 추정, 실제 소스 아님",
+          "lang": "c",
+          "code": "// 클라이언트가 보낸 개수를 그대로 사용\nfor (i = 0; i < numCellCaches; i++)      // 상한 검사 없음\n    settings->cellInfo[i] = read_cell(s); // 고정 배열 밖 쓰기"
+        },
+        {
+          "kind": "fix",
+          "label": "재구성, 추정, 실제 패치 미확인",
+          "lang": "c",
+          "code": "if (numCellCaches > ARRAYSIZE(settings->cellInfo))\n    return FALSE; // 프로토콜 상한 초과 거부"
+        }
+      ],
+      "trigger": "원격, 무인증 클라이언트가 프록시에 접속해 조작된 Confirm Active 전송. freerdp-proxy 운영 환경 한정.",
+      "exploitation": "이론상 가능. 힙 손상과 RCE 가능성이 기재돼 있으나 악용이나 공개 PoC는 확인 못 했다.",
+      "patch": "3.32.2. 상세 패치 내용은 확인 못 했다.",
+      "detection": "공개된 탐지 정보 없음."
+    },
+    "deepDive": null
+  },
+  {
+    "cve": "CVE-2026-121953",
+    "date": "2026-11-06",
+    "grade": "orange",
+    "title": "FreeRDP rdpgfx 채널 이름 중복으로 클라이언트 UAF",
+    "product": "FreeRDP 3.32.2 미만 (클라이언트)",
+    "summary": "악성 RDP 서버가 이름이 같은 동적 가상 채널을 두 번 만들었다 닫으면 콜백이 해제된 채 남는다. 사용자 추가 조작 없이 클라이언트에서 UAF가 나고 권고에 재현 드라이버가 들어 있다. 같은 3.32.2에서 힙 쓰기 CVE-2026-121958도 고쳐졌다.",
+    "cvss": 9.8,
+    "kev": false,
+    "poc": true,
+    "tags": [
+      "FreeRDP",
+      "RDP client",
+      "UAF",
+      "rdpgfx",
+      "DVC",
+      "Linux"
+    ],
+    "links": [
+      {
+        "label": "FreeRDP 권고 GHSA-6wqx-rv3q-vcxp",
+        "url": "https://github.com/FreeRDP/FreeRDP/security/advisories/GHSA-6wqx-rv3q-vcxp"
+      },
+      {
+        "label": "VulnCheck 권고",
+        "url": "https://www.vulncheck.com/advisories/freerdp-before-3.32.2-use-after-free-via-rdpgfx-dynamic-virtual-channel-close"
+      },
+      {
+        "label": "CVE-2026-121958 권고",
+        "url": "https://github.com/FreeRDP/FreeRDP/security/advisories/GHSA-m59q-wm7v-mp57"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-121953"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "channels/drdynvc/client/drdynvc_main.c의 dvcman_create_channel은 ChannelId 유일성만 보고 ChannelName 유일성은 보지 않아 같은 이름의 두 번째 채널이 들어온다. 리스너에는 콜백 슬롯이 하나뿐이라 두 번째 채널이 첫 번째의 콜백을 덮어쓴다. rdpgfx_on_close는 그 콜백을 해제하면서 슬롯을 비우지 않는다(rdpei_on_close, video_control_on_close는 비운다). 첫 채널은 살아 있으므로 이후 DATA PDU가 rdpgfx_send_frame_acknowledge_pdu에서 해제된 콜백을 역참조한다. 객체 소유권은 채널당인데 슬롯은 리스너당이라는 수명 불일치, CWE-416이다.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "재구성, 실제 소스 아님 (권고 설명 기반)",
+          "lang": "c",
+          "code": "// 채널 2개가 같은 listener 슬롯을 공유\nlistener->channel_callback = callback;  // 두 번째가 첫 번째를 덮음\n// rdpgfx_on_close\nfree(callback);                          // 슬롯은 그대로, dangling\n// 첫 채널의 DATA PDU 처리\ncallback->channel->Write(...);           // 해제된 메모리 역참조"
+        },
+        {
+          "kind": "fix",
+          "label": "재구성, 권고의 제안 수정 기반, 실제 패치 미확인",
+          "lang": "c",
+          "code": "if (dvcman_find_channel_by_name(mgr, name)) // 활성 채널과 이름 중복이면 거부\n    return ERROR_ALREADY_EXISTS;\nif (listener->channel_callback == callback)\n    listener->channel_callback = NULL;       // on_close에서 슬롯 비움"
+        }
+      ],
+      "trigger": "악성 서버 또는 리다이렉트된 서버에 클라이언트가 접속. 핸드셰이크 뒤 추가 상호작용 없음. /gfx 옵션으로 rdpgfx가 로드돼야 하고 rdpsnd에도 같은 원인의 경로가 있다(별도 검증은 안 됨).",
+      "exploitation": "PoC 공개(권고 내 재현, ASan 수준). 해제 메모리를 재점유하면 콜백 포인터 제어와 간접 호출 가능성이 있다는 건 작성자 평가이고 실증은 없다. 아니면 클라이언트 크래시.",
+      "patch": "3.32.2. 권고의 제안은 같은 이름 CREATE_REQUEST 거부와 on_close 슬롯 정리이며, 실제 커밋은 이번 실행에서 확인 못 했다. 함께 나온 CVE-2026-121958은 surface 해시 키 16비트 절단에 의한 힙 범위 밖 쓰기. CVSS 9.8은 VulnCheck 값이고 권고 자체는 High다.",
+      "detection": "공개된 탐지 규칙 없음. 패키지 버전 확인이 우선이고 xfreerdp, 리모미나 등 FreeRDP 사용 클라이언트 크래시 로그(추정)."
+    },
+    "deepDive": null
+  },
+  {
+    "cve": "CVE-2026-122006",
+    "date": "2026-11-06",
+    "grade": "orange",
+    "title": "Rails Active Storage, ImageMagick MSL 코더로 파일 쓰기",
+    "product": "Rails Active Storage 8.0.5.2, 8.1.4.1 미만 (mini_magick 사용 시)",
+    "summary": "업로드를 첨부만 해도 도는 ImageMagick 분석기에 코더 제한이 없어서, 조작된 SVG가 파일을 읽고 쓰는 MSL 코더까지 닿는다. 무인증 임의 파일 쓰기, Disk 서비스면 secret_key_base 읽기로 이어진다. 기본 :vips 앱은 조건에서 빠지며 악용 보고는 없다.",
+    "cvss": 9.8,
+    "kev": false,
+    "poc": false,
+    "tags": [
+      "Rails",
+      "Active Storage",
+      "ImageMagick",
+      "MSL",
+      "file write",
+      "CWE-1188"
+    ],
+    "links": [
+      {
+        "label": "Rails 권고 GHSA-f3w6-w445-fwh9",
+        "url": "https://github.com/rails/rails/security/advisories/GHSA-f3w6-w445-fwh9"
+      },
+      {
+        "label": "패치 커밋 (8.1)",
+        "url": "https://github.com/rails/rails/commit/468aa9a93fc98f5476b6821770f4ccfcb7f7d328"
+      },
+      {
+        "label": "The Hacker News",
+        "url": "https://thehackernews.com/2026/11/critical-rails-flaw-lets-attackers.html"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-122006"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "ImageMagick은 확장자가 아니라 파일 내용으로 코더를 고르고, 일부 코더는 이미지 안에 적힌 다른 파일을 직접 다룬다. Active Storage는 이를 전혀 제한하지 않아 서버의 policy.xml만이 유일한 방어선이었는데, Debian과 Ubuntu 기본 정책은 해당 코더를 막지 않는다. 분석기는 첨부 시점에 돌기 때문에 variant나 preview 호출 없이도 도달한다. 신고된 체인에서는 SVG 경유로 스크립팅 코더 MSL에 닿았다. 신뢰할 수 없는 입력을 받는 처리기에 기본값으로 위험 기능을 켜 둔 구조로, CWE-1188이다.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "재구성, 실제 소스 아님 (커밋 메시지 기반)",
+          "lang": "ruby",
+          "code": "# 첨부 직후 자동 실행되는 분석기\nimage = MiniMagick::Image.new(tempfile.path)\nimage.width # 내용 기반 코더 선택, SVG → MSL 도달 가능\n# Rails 쪽 코더 제한 없음, 서버 policy.xml에 전적으로 의존"
+        },
+        {
+          "kind": "fix",
+          "label": "커밋 468aa9a 내용 요약 기반 재구성",
+          "lang": "xml",
+          "code": "<!-- activestorage/lib/active_storage/image_magick/policy.xml -->\n<policy domain=\"coder\" rights=\"none\" pattern=\"MSL\" />\n<policy domain=\"coder\" rights=\"none\" pattern=\"EPS\" /> <!-- Ghostscript 계열 -->\n<policy domain=\"delegate\" rights=\"none\" pattern=\"gs\" />\n<policy domain=\"path\" rights=\"none\" pattern=\"@*\" /> <!-- @파일 간접참조 -->"
+        }
+      ],
+      "trigger": "원격, 무인증. variant_processor가 :mini_magick(load_defaults 6.1 이하의 기본값, 7.0부터 기본은 :vips)이고, ImageMagick 정책이 해당 코더를 막지 않으며, 신뢰할 수 없는 업로드를 받을 때.",
+      "exploitation": "이론상 가능, 악용과 공개 PoC 보고 없음. 파일 쓰기가 기본 프리미티브이고 Disk 서비스면 읽기까지 되어 secret_key_base 탈취, 코드 실행이나 수평 이동으로 이어질 수 있다고 권고가 적고 있다.",
+      "patch": "8.1.4.1, 8.0.5.2. 위험 코더, 네트워크, 표시, Ghostscript, @ 간접참조를 막는 policy.xml을 동봉하고 MAGICK_CONFIGURE_PATH로 적용하며 mini_magick 5.1 이상을 강제한다. 다만 정책은 추가 방식이라 서버 policy.xml의 허용 규칙이 이를 덮을 수 있고, cli_env를 직접 바꾸는 앱, GraphicsMagick에는 효과가 없다. 8.0 미만은 시스템 policy.xml로 막아야 한다. 8.0 보안 지원은 2026-11-07 종료. 관련 CVSS 8.8 결함 GHSA-v924-7rp8-4mxh도 같이 고쳐졌다.",
+      "detection": "침해 여부 확인법은 권고에 없다. bin/rails runner로 MiniMagick.identify의 정책 목록 출력을 확인해 정책 로드를 검증한다. Disk 서비스였다면 secret_key_base와 프로세스가 읽을 수 있는 시크릿 전체 교체."
+    },
+    "deepDive": null
+  },
+  {
     "cve": "CVE-2026-122266",
     "date": "2026-11-05",
     "grade": "green",
@@ -773,6 +1252,70 @@
           "code": "/* 정책 판정을 통과한 흐름만 기록 */\nif (policy_allows(&key))\n    bpf_map_update_elem(&conntrack, &key, &allow, BPF_NOEXIST);"
         }
       ]
+    },
+    "deepDive": null
+  },
+  {
+    "cve": "CVE-2026-123158",
+    "date": "2026-11-06",
+    "grade": "orange",
+    "title": "OpenSSH musl crypt 오류값 충돌로 비밀번호 우회 (sshhole)",
+    "product": "OpenSSH 10.6p2 미만, musl libc, PAM 미사용 (Alpine 등)",
+    "summary": "musl의 crypt()가 실패 때 NULL 대신 문자열 *를 돌려주는데, 비밀번호 없는 계정의 shadow 필드도 *라서 둘이 일치해 버린다. 256바이트를 넘는 비밀번호로 해당 계정 로그인이 가능해진다. glibc나 UsePAM yes는 영향이 없고 PoC 랩이 공개됐다.",
+    "cvss": 8.1,
+    "kev": false,
+    "poc": true,
+    "tags": [
+      "OpenSSH",
+      "Alpine",
+      "musl",
+      "auth bypass",
+      "crypt",
+      "CWE-394"
+    ],
+    "links": [
+      {
+        "label": "Alpine 권고",
+        "url": "https://alpinelinux.org/posts/2026-11-05-openssh-password-authentication-bypass"
+      },
+      {
+        "label": "OpenSSH 패치 커밋",
+        "url": "https://github.com/openssh/openssh-portable/commit/4353fdc43ef646c43a8dda7025cc1a898caf1482"
+      },
+      {
+        "label": "GitHub Advisory",
+        "url": "https://github.com/advisories/GHSA-4fcc-vm97-gx3x"
+      },
+      {
+        "label": "sshhole 설명",
+        "url": "https://sshhole.com"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-123158"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "PAM이 없을 때 sshd의 sys_auth_passwd()는 입력 비밀번호를 crypt()로 해시해서 shadow 필드와 strcmp로 비교한다. 저장된 필드가 소금으로 쓰기엔 너무 짧으면 다른 계정의 소금을 빌리는데, 2016년 타이밍 공격 대응(CVE-2016-6210) 때 생긴 경로로 $5$나 $6$ 해시 계정이 있으면 SHA crypt가 호출된다. musl은 256바이트 초과 키를 거부하고, POSIX의 NULL 대신 오류 문자열 *를 반환한다. 비밀번호 없는 계정의 필드도 *이므로 실패값과 저장값이 같아진다. 대역 내 오류 신호(in-band error)와 잠금 표식이 같은 값이라는 게 근본 문제이고 CWE-394에 해당한다.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "auth-passwd.c 재구성, 실제 소스 아님 (Alpine, sshhole 설명 기반)",
+          "lang": "c",
+          "code": "// pw_password == \"*\" (key-only 계정)\nencrypted = xcrypt(password, salt); // 긴 입력이면 musl이 \"*\" 반환\n// NULL이 아니므로 통과하고\nreturn encrypted != NULL &&\n       strcmp(encrypted, pw_password) == 0; // \"*\" == \"*\""
+        },
+        {
+          "kind": "fix",
+          "label": "OpenSSH 커밋 4353fdc 발췌, 앞뒤 재구성",
+          "lang": "c",
+          "code": "#define MIN_PASSWORD_HASH_LEN 4\n// 저장값이 해시로 보이기엔 짧으면 비교 자체를 안 함\nreturn encrypted != NULL &&\n       strlen(pw_password) >= MIN_PASSWORD_HASH_LEN &&\n       strcmp(encrypted, pw_password) == 0;"
+        }
+      ],
+      "trigger": "원격, 무인증. 조건은 전부 충족돼야 한다: musl, PAM 미사용, PasswordAuthentication yes(기본), 필드가 *인 계정 존재(! 잠금은 안전), $5$ 또는 $6$ 해시 계정 존재, 공격자가 계정 이름을 알 것. root는 기본 PermitRootLogin prohibit-password로 직접 로그인은 막힌다.",
+      "exploitation": "PoC 공개(공개 랩 저장소 존재), 실제 악용 보고 없음. 프리미티브는 메모리 손상이 아닌 순수 인증 로직 우회로 곧장 일반 계정 셸이 되고, doas 등으로 권한 상승 가능 계정이면 root까지 이어진다.",
+      "patch": "OpenSSH 10.6p2에서 짧은 저장값을 해시로 취급하지 않게 했다. Alpine 고정 버전: edge 10.6_p2-r0, 3.24 10.3_p1-r2, 3.23 10.2_p1-r1, 3.22 10.0_p1-r11, 3.21 9.9_p2-r1, 3.20 9.7_p1-r6, 3.19 9.6_p1-r3, 3.18 9.3_p2-r4, 3.17 9.1_p1-r7, 3.16 9.0_p1-r6. 업그레이드 후 sshd 재시작 필수. 임시 완화는 PasswordAuthentication no.",
+      "detection": "공개된 시그니처 없음. /etc/shadow에서 필드가 *인 계정을 찾고, 그 계정의 Accepted password 로그가 있으면 수상하다. key-only 계정에 비밀번호 로그인 성공 자체가 이상 신호(추정). OpenWrt, Buildroot, Yocto 등 musl 임베디드도 조건 점검."
     },
     "deepDive": null
   },
@@ -999,6 +1542,51 @@
           "code": "} catch (RuntimeException e) {  // 기존 AIOOBE에서 확대\n    return null;                // 디코딩 실패로 처리\n}\n// InboundSmsHandler: 실패 메시지는 raw 테이블에서 삭제해 재처리 차단"
         }
       ]
+    },
+    "deepDive": null
+  },
+  {
+    "cve": "CVE-2026-83844",
+    "date": "2026-11-06",
+    "grade": "gray",
+    "title": "Paint 제로클릭 RCE 보도, 실체는 고복잡도 Store 앱 패치 혼선",
+    "product": "Microsoft Paint (Windows 11 Store 앱)",
+    "summary": "10월 패치 CVE가 제로클릭 RCE로 다시 퍼졌는데, 벡터는 AC:H이고 Microsoft 평가는 악용 가능성 낮음, 악용 보고도 없다. 실제 이슈는 고정 버전 표기가 11.2605.91.0에서 11.2609.401.0으로 바뀌었고 Store가 구버전을 주는 사례가 나왔다는 점이다. 학교 PC는 버전 직접 확인이 필요하다.",
+    "cvss": 8.1,
+    "kev": false,
+    "poc": false,
+    "tags": [
+      "Windows",
+      "Paint",
+      "Microsoft Store",
+      "hype check",
+      "CWE-125"
+    ],
+    "links": [
+      {
+        "label": "MSRC",
+        "url": "https://msrc.microsoft.com/update-guide/vulnerability/CVE-2026-83844"
+      },
+      {
+        "label": "Windows Forum 혼선 정리",
+        "url": "https://windowsforum.com/news/cve-2026-83844-windows-11-paint-rce-fix-confusion-and-how-to-check-your-version.451018/"
+      },
+      {
+        "label": "Mallory 요약",
+        "url": "https://mallory.ai/stories/01a1a975-0c6b-7620-8db4-54461d68270c"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-83844"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "Microsoft 설명은 Paint의 범위 밖 읽기(CWE-125)가 네트워크 경유 코드 실행을 허용한다는 한 문장뿐이다. 파서 위치, 함수, 입력 형식은 공개된 세부 없음. 범위 밖 읽기가 왜 코드 실행으로 분류됐는지도 설명이 없어 코드 블록은 넣지 않았다.",
+      "trigger": "AV:N, AC:H, PR:N, UI:N이라 숫자상 제로클릭이지만 전달 경로가 불명확하다. 일부는 조작된 이미지, MSRC 문구는 서비스로 보낸 패킷을 언급한다. Paint는 수신 서비스가 아니라 사용자가 여는 앱이라 UI:N 해석에 의문이 있다(추정).",
+      "exploitation": "이론상 가능. 악용 없음, 공개 PoC 없음, CISA SSVC도 Exploitation none, Automatable no, MSRC 평가 악용 가능성 낮음.",
+      "patch": "Microsoft Store로 2026-10-13 배포. CVE 레코드는 11.2605.91.0 미만이 영향이라 하고 11-02 MSRC 문서는 11.2609.401.0을 고정 버전으로 적었는데 이유 설명이 없다. Windows 누적 업데이트로는 안 고쳐지고, 11월 5일 기준 Store가 11.2603.251.0, 11.2605.81.0을 주는 사례가 보고됐다.",
+      "detection": "PowerShell Get-AppxPackage -Name Microsoft.Paint로 버전을 확인한다. 11.2605.91.0 미만이면 어느 기준으로도 취약하고 목표는 11.2609.401.0 이상. 탐지 시그니처는 공개된 것 없음."
     },
     "deepDive": null
   },
