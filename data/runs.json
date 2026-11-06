@@ -22,5 +22,11 @@
     "note": "Apple PAC 우회 KEV 등재, Zyxel GS1900 패치 우회 제로데이, Sogou 입력기 하이재킹, OpenSSH musl 인증 우회, Rails ImageMagick, Xen grant copy, FreeRDP, Paint 과장 점검.",
     "count": 10,
     "deepDive": null
+  },
+  {
+    "date": "2026-11-07",
+    "note": "SonicWall SSLVPN SAML 우회 KEV 등재, OpenSSH sshhole 실제 악용 관측으로 red 상향, GPUStack 루프백 자동 관리자 악용(누락분 추가).",
+    "count": 2,
+    "deepDive": null
   }
 ]

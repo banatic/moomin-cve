@@ -230,6 +230,70 @@
     "deepDive": null
   },
   {
+    "cve": "CVE-2026-102895",
+    "date": "2026-11-07",
+    "grade": "red",
+    "title": "GPUStack 루프백 요청을 관리자로 자동 인증",
+    "product": "GPUStack 2.2.0 미만 (LLM 추론 클러스터 관리)",
+    "summary": "인증 정보가 없는 요청이라도 출발지가 127.0.0.1이면 첫 관리자 계정으로 처리하는 코드가 기본 활성이었다. 같은 호스트의 리버스 프록시 뒤에 있거나, 게이트웨이 모드에서 X-GPUStack-Real-IP 헤더를 위조하면 원격 무인증 관리자가 된다. 벤더가 2.1.1 배포에서 실제 악용(추론 백엔드로 리버스 셸)을 확인했다. 11월 5일 보도분으로 전날 수집에서 빠져 오늘 추가.",
+    "cvss": 9.8,
+    "kev": false,
+    "poc": false,
+    "tags": [
+      "GPUStack",
+      "AI infra",
+      "auth bypass",
+      "CWE-290",
+      "CWE-346",
+      "reverse proxy"
+    ],
+    "links": [
+      {
+        "label": "GitHub 보안 권고 GHSA-gj9m-f8ph-pmhr",
+        "url": "https://github.com/gpustack/gpustack/security/advisories/GHSA-gj9m-f8ph-pmhr"
+      },
+      {
+        "label": "수정 커밋 53f42a6",
+        "url": "https://github.com/gpustack/gpustack/commit/53f42a6a553542974396d16a4ff6b12bcbedb48d"
+      },
+      {
+        "label": "Ostorlab 분석",
+        "url": "https://blog.ostorlab.co/gpustack-auth-bypass-rce-cve-2026-102895.html"
+      },
+      {
+        "label": "SecurityOnline 악용 보도",
+        "url": "https://securityonline.info/gpustack-authentication-bypass-cve-2026-102895-exploited/"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-102895"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "gpustack/api/auth.py의 get_current_user()는 Basic, Bearer, API 키, 쿠키 순으로 사용자를 찾고, 아무것도 없으면 client_ip_getter()가 127.0.0.1을 돌려줄 때 is_admin=True인 첫 사용자를 반환했다. force_auth_localhost 기본값이 False라 이 폴백이 기본으로 켜져 있었다. client_ip_getter()는 TCP 피어 주소(request.client.host)를 쓰는데, 같은 호스트의 nginx 같은 리버스 프록시를 거치면 모든 외부 요청의 피어가 127.0.0.1이 된다. 게이트웨이 모드에서는 X-GPUStack-Real-IP 헤더 값을 그대로 출처로 믿는 경로도 있었다. 네트워크 위치를 인증 수단으로 쓴 설계 결함으로 CWE-290, CWE-346에 해당한다.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "gpustack/api/auth.py 수정 전 발췌",
+          "lang": "python",
+          "code": "def client_ip_getter(request):\n    ...\n    return request.client.host  # 프록시 뒤면 항상 127.0.0.1\n\n# get_current_user() 안, 자격증명 없음\nif user is None and client_ip_getter(request=request) == \"127.0.0.1\":\n    if not server_config.force_auth_localhost:  # 기본 False\n        user = await User.first_by_field(session, \"is_admin\", True)"
+        },
+        {
+          "kind": "fix",
+          "label": "커밋 53f42a6 발췌 (fix: remove localhost auto-admin bypass)",
+          "lang": "diff",
+          "code": "-        if user is None and client_ip_getter(request=request) == \"127.0.0.1\":\n-            if not server_config.force_auth_localhost:\n-                user = await User.first_by_field(session, \"is_admin\", True)\n         if user:\n             if not user.is_active:\n# force_auth_localhost는 no-op로 남기고 경고만 출력"
+        }
+      ],
+      "trigger": "원격 무인증. 조건: GPUStack 2.2.0 미만, API가 같은 호스트의 리버스 프록시 뒤에 있거나(피어가 루프백), 내장 게이트웨이 모드에서 헤더 위조가 통하는 구성. force_auth_localhost=true로 바꾼 배포는 해당 없음.",
+      "exploitation": "실제 악용됨(벤더 권고, 2.1.1 배포). 흐름은 무인증 관리자 획득, 영구 관리자 API 키 발급, 관리자 전용 기능으로 사용자 정의 추론 백엔드를 등록해 워커 호스트에서 명령 실행(리버스 셸)으로 이어진다. 워커와 클라우드 공급자 비밀도 읽을 수 있다. 공격 시점, 규모, 주체는 미공개.",
+      "patch": "2.2.0(6월 18일 릴리스)에서 루프백 자동 관리자 분기를 통째로 삭제했고 force_auth_localhost는 무시되는 옵션이 됐다. 같은 제품의 CVE-2026-102894(/auth/saml/callback 서명 미검증, CVSS 9.1)까지 막으려면 2.2.2 이상. 업그레이드는 기존 API 키나 계정을 회수하지 않으므로 키 폐기와 자격증명 교체가 따로 필요하다. 임시 완화: force_auth_localhost=true, 프록시에서 X-GPUStack-Real-IP 제거, 외부 노출 차단.",
+      "detection": "공식 IOC 없음. 승인 이력 없는 관리자 계정이나 와일드카드 범위 API 키, 기록에 없는 추론 백엔드, 워커에서 백엔드 프로세스가 셸이나 외부 대화형 연결을 띄우는지 확인. 프록시 로그에서 인증 헤더 없이 성공한 관리 API 요청, 외부 클라이언트가 보낸 X-GPUStack-Real-IP 헤더."
+    },
+    "deepDive": null
+  },
+  {
     "cve": "CVE-2026-104935",
     "date": "2026-11-02",
     "grade": "red",
@@ -1258,10 +1322,10 @@
   {
     "cve": "CVE-2026-123158",
     "date": "2026-11-06",
-    "grade": "orange",
+    "grade": "red",
     "title": "OpenSSH musl crypt 오류값 충돌로 비밀번호 우회 (sshhole)",
     "product": "OpenSSH 10.6p2 미만, musl libc, PAM 미사용 (Alpine 등)",
-    "summary": "musl의 crypt()가 실패 때 NULL 대신 문자열 *를 돌려주는데, 비밀번호 없는 계정의 shadow 필드도 *라서 둘이 일치해 버린다. 256바이트를 넘는 비밀번호로 해당 계정 로그인이 가능해진다. glibc나 UsePAM yes는 영향이 없고 PoC 랩이 공개됐다.",
+    "summary": "musl의 crypt()가 실패 때 NULL 대신 문자열 *를 돌려주는데, 비밀번호 없는 계정의 shadow 필드도 *라서 둘이 일치해 버린다. 256바이트를 넘는 비밀번호로 해당 계정 로그인이 가능해진다. glibc나 UsePAM yes는 영향이 없고, 공개 수 시간 만에 허니팟에서 실제 악용이 관측됐다.",
     "cvss": 8.1,
     "kev": false,
     "poc": true,
@@ -1271,12 +1335,17 @@
       "musl",
       "auth bypass",
       "crypt",
-      "CWE-394"
+      "CWE-394",
+      "in the wild"
     ],
     "links": [
       {
         "label": "Alpine 권고",
         "url": "https://alpinelinux.org/posts/2026-11-05-openssh-password-authentication-bypass"
+      },
+      {
+        "label": "Help Net Security 악용 보도",
+        "url": "https://www.helpnetsecurity.com/2026/11/06/openssh-sshole-cve-2026-123158-exploitation/"
       },
       {
         "label": "OpenSSH 패치 커밋",
@@ -1295,7 +1364,12 @@
         "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-123158"
       }
     ],
-    "history": [],
+    "history": [
+      {
+        "date": "2026-11-07",
+        "note": "Previdian이 공개 9시간 안에 Alpine 허니팟에서 root 획득까지 실제 악용을 관측. 등급 orange에서 red로. CISA KEV는 아직 미등재."
+      }
+    ],
     "detail": {
       "rootCause": "PAM이 없을 때 sshd의 sys_auth_passwd()는 입력 비밀번호를 crypt()로 해시해서 shadow 필드와 strcmp로 비교한다. 저장된 필드가 소금으로 쓰기엔 너무 짧으면 다른 계정의 소금을 빌리는데, 2016년 타이밍 공격 대응(CVE-2016-6210) 때 생긴 경로로 $5$나 $6$ 해시 계정이 있으면 SHA crypt가 호출된다. musl은 256바이트 초과 키를 거부하고, POSIX의 NULL 대신 오류 문자열 *를 반환한다. 비밀번호 없는 계정의 필드도 *이므로 실패값과 저장값이 같아진다. 대역 내 오류 신호(in-band error)와 잠금 표식이 같은 값이라는 게 근본 문제이고 CWE-394에 해당한다.",
       "code": [
@@ -1313,9 +1387,9 @@
         }
       ],
       "trigger": "원격, 무인증. 조건은 전부 충족돼야 한다: musl, PAM 미사용, PasswordAuthentication yes(기본), 필드가 *인 계정 존재(! 잠금은 안전), $5$ 또는 $6$ 해시 계정 존재, 공격자가 계정 이름을 알 것. root는 기본 PermitRootLogin prohibit-password로 직접 로그인은 막힌다.",
-      "exploitation": "PoC 공개(공개 랩 저장소 존재), 실제 악용 보고 없음. 프리미티브는 메모리 손상이 아닌 순수 인증 로직 우회로 곧장 일반 계정 셸이 되고, doas 등으로 권한 상승 가능 계정이면 root까지 이어진다.",
+      "exploitation": "실제 악용됨(Previdian 관측, CISA KEV 미등재). CVE 공개 9시간 안에 첫 시도, 일본 IP 한 곳에서 8회, 허니팟 한 대에서 root 접근 확인. 공격자는 긴 비밀번호로 로그인 후 비대화형 세션으로 id, uname, hostname 정찰만 수행. GitHub의 PoC들은 검증되지 않았고 악성코드가 섞였을 수 있다는 경고가 있다. 프리미티브는 메모리 손상이 아닌 순수 인증 로직 우회로 곧장 일반 계정 셸이 되고, Alpine 클라우드 이미지(3.18.11~3.24.3)의 기본 사용자는 비밀번호 없는 doas가 있어 root까지 이어진다.",
       "patch": "OpenSSH 10.6p2에서 짧은 저장값을 해시로 취급하지 않게 했다. Alpine 고정 버전: edge 10.6_p2-r0, 3.24 10.3_p1-r2, 3.23 10.2_p1-r1, 3.22 10.0_p1-r11, 3.21 9.9_p2-r1, 3.20 9.7_p1-r6, 3.19 9.6_p1-r3, 3.18 9.3_p2-r4, 3.17 9.1_p1-r7, 3.16 9.0_p1-r6. 업그레이드 후 sshd 재시작 필수. 임시 완화는 PasswordAuthentication no.",
-      "detection": "공개된 시그니처 없음. /etc/shadow에서 필드가 *인 계정을 찾고, 그 계정의 Accepted password 로그가 있으면 수상하다. key-only 계정에 비밀번호 로그인 성공 자체가 이상 신호(추정). OpenWrt, Buildroot, Yocto 등 musl 임베디드도 조건 점검."
+      "detection": "공개된 시그니처 없음. /etc/shadow에서 필드가 *인 계정을 찾고, 그 계정의 Accepted password 로그가 있으면 수상하다. key-only 계정에 비밀번호 로그인 성공 자체가 이상 신호(추정). OpenWrt, Buildroot, Yocto 등 musl 임베디드도 조건 점검. Previdian 관측 IP 89.116.89.18. /var/log/messages의 Accepted password for 중 alpine, root, key-only 계정 항목, 이후 doas 사용과 authorized_keys 변경을 확인. 패키지 업데이트만으로는 sshd가 재시작되지 않는다."
     },
     "deepDive": null
   },
@@ -1379,6 +1453,66 @@
           "code": "// 출력 문맥에 맞춰 검증, 이스케이프\nif (!is_safe_value(v)) return HTTP_400;\nescape_for_context(out, sizeof(out), v);"
         }
       ]
+    },
+    "deepDive": null
+  },
+  {
+    "cve": "CVE-2026-19868",
+    "date": "2026-11-07",
+    "grade": "red",
+    "title": "SonicWall SSLVPN 대체 인증 경로로 SAML, MFA 우회",
+    "product": "SonicWall SonicOS SSLVPN (Gen7 7.3.x, Gen8 8.2.x)",
+    "summary": "SAML(과 SAML에 묶인 MFA)을 강제한 SSLVPN에서, 다른 인증 방식(로컬, LDAP 등)의 유효 자격증명만 있으면 SAML 단계를 건너뛰고 로그인할 수 있다. SonicWall이 실제 악용을 보고했고 CISA가 11월 6일 KEV에 넣었다. 기술 세부는 공개되지 않았다.",
+    "cvss": 7.5,
+    "kev": true,
+    "poc": false,
+    "tags": [
+      "SonicWall",
+      "SSLVPN",
+      "SAML",
+      "MFA bypass",
+      "CWE-308",
+      "KEV"
+    ],
+    "links": [
+      {
+        "label": "CISA KEV 추가 공지",
+        "url": "https://www.cisa.gov/news-events/alerts/2026/11/06/cisa-adds-one-known-exploited-vulnerability-catalog"
+      },
+      {
+        "label": "캐나다 사이버보안센터 AV26-1133 요약",
+        "url": "https://www.defconlevel.com/alert/2026-11-06-sonicwall-security-advisory-av26-1133"
+      },
+      {
+        "label": "WindowsForum 정리",
+        "url": "https://windowsforum.com/news/cve-2026-19868-cisa-flags-exploited-sonicwall-sslvpn-saml-and-mfa-bypass.451256/"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-19868"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "SSLVPN 서비스의 인증 강제(authentication enforcement) 결함이다. 관리자가 SAML을 요구하도록 정책을 걸어도, 장비가 함께 지원하는 대체 인증 방식으로 들어온 요청은 SAML 요구 여부를 다시 확인하지 않는 것으로 설명된다. 결과적으로 정책상 2요소였던 접근이 단일 요소(비밀번호)로 내려앉는다. CWE-308(단일 요소 인증 사용). 어떤 핸들러나 설정 필드에서 분기가 빠졌는지는 벤더 권고(SNWLID-2026-0014)에 공개되지 않았다.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "재구성, 실제 소스 아님, 추정",
+          "lang": "c",
+          "code": "// 인증 방식별로 핸들러가 갈라짐\nif (req->method == AUTH_SAML)\n    ok = saml_verify(req) && mfa_ok(req);\nelse\n    ok = local_or_ldap_verify(req); // SAML 강제 정책을 여기서 안 봄\nif (ok) grant_vpn_session(req->user);"
+        },
+        {
+          "kind": "fix",
+          "label": "재구성, 실제 소스 아님, 추정",
+          "lang": "c",
+          "code": "// 정책은 방식과 무관하게 세션 발급 직전에 한 번 더 강제\nif (policy_requires_saml(req->user) && req->method != AUTH_SAML)\n    return DENY; // 대체 경로 차단\nif (ok) grant_vpn_session(req->user);"
+        }
+      ],
+      "trigger": "원격. 공격자는 대체 인증 방식의 유효 자격증명(크리덴셜 스터핑, 유출 계정 등)이 필요하다. SSLVPN이 SAML과 다른 인증 방식을 동시에 허용하도록 구성된 장비가 대상(추정). 무인증 접근이나 RCE라는 근거는 없다.",
+      "exploitation": "실제 악용됨(SonicWall 보고, CISA KEV). 프리미티브는 메모리 손상이 아니라 정책 우회로, 곧장 내부망 VPN 세션이 된다. 이후는 일반적인 VPN 침입 후 측면 이동 흐름. 공격 주체, 규모, 랜섬웨어 연관성은 미공개(KEV 표기 Unknown).",
+      "patch": "영향: 7.3.3-7015 이하, 8.2.2-8015 이하(KEV 요약 기준). 캐나다 권고는 7.3.4-7013 미만, 8.2.2-8015 미만으로 표기해 출처마다 경계가 조금 다르다. 수정 빌드와 패치 완결성은 벤더 권고 원문을 확인 못 했다. 임시로는 SSLVPN에서 SAML 외 인증 방식을 끄고, 노출된 계정 비밀번호를 교체한다(추정). KEV 기한 2026-11-20.",
+      "detection": "공개된 IOC 없음. SSLVPN 로그인 이벤트에서 SAML 강제 대상 사용자가 SAML이 아닌 방식으로 성공한 기록을 찾는 게 직접적인 헌팅 포인트(추정). 짧은 시간 다수 실패 후 성공(브루트포스) 패턴도 함께 볼 것."
     },
     "deepDive": null
   },
