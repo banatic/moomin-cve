@@ -1725,6 +1725,72 @@
     "deepDive": null
   },
   {
+    "cve": "CVE-2026-96652",
+    "date": "2026-11-08",
+    "grade": "red",
+    "title": "Plex2Shell, Plex Media Server SSRF에서 RCE까지 체인, QNAP NAS 침해 공지",
+    "product": "Plex Media Server 1.43.2 이하 (QNAP, Synology 등 NAS 앱 포함)",
+    "summary": "/player/timeline 엔드포인트가 X-Plex-Token 값을 검사하지 않고 protocol 파라미터로 받은 문자열로 아웃바운드 요청을 만들어 무인증 SSRF가 된다. 이를 URI 주입(CVE-2026-96654), 임의 파일 쓰기(CVE-2026-96656)와 엮어 소유자 토큰 탈취, Codecs 폴더에 라이브러리 심기, 트랜스코딩 시 로드로 코드 실행까지 간다. 10월에 PoC 공개와 CISA KEV 등재가 이미 있었고, 11월 6일 QNAP이 자사 NAS의 Plex 설치본 침해 신고를 받고 있다는 보안 공지를 냈다.",
+    "cvss": 8.6,
+    "kev": true,
+    "poc": true,
+    "tags": [
+      "Plex",
+      "QNAP",
+      "NAS",
+      "SSRF",
+      "CWE-918",
+      "file write",
+      "DLL loading",
+      "chain"
+    ],
+    "links": [
+      {
+        "label": "QNAP 보안 공지 (2026-11-06)",
+        "url": "https://www.qnap.com/en/security-news/2026/qnap-security-notice-plex-media-server-vulnerabilities-plex2shell-update-to-1-43-3-10861-or-later-immediately"
+      },
+      {
+        "label": "SonicWall 체인 분석",
+        "url": "https://www.sonicwall.com/blog/plex2shell-plex-media-server-exploit-chain-ssrf-to-arbitrary-code-execution"
+      },
+      {
+        "label": "BleepingComputer CISA KEV 보도",
+        "url": "https://www.bleepingcomputer.com/news/security/cisa-hackers-chain-plex-flaws-in-plex2shell-attacks-to-breach-servers/"
+      },
+      {
+        "label": "QNAP 커뮤니티 점검 FAQ",
+        "url": "https://community.qnap.com/t/plex2shell-check-and-remediation-faq-for-qnap-nas-users/7471"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-96652"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "Plex Media Server의 Companion 프로토콜 처리부 /player/timeline(POST, 32400 포트)는 X-Plex-Token 헤더가 있기만 하면 값은 검증하지 않았다. 같은 요청의 protocol 파라미터는 http나 https 같은 스킴을 기대하지만 검증 없이 전체 URL도 받아, 서버가 문자열 결합으로 아웃바운드 POST 대상을 만든다. 그래서 공격자가 서버를 시켜 루프백의 내부 서비스로 요청을 보내게 할 수 있다(CWE-918, CVE-2026-96652, 임의 호스트판은 CVE-2026-96655). 여기에 인코딩된 URI 스킴 중화 실패(CVE-2026-96654)로 GetResultFromNetwork 경로가 127.0.0.1로 시작하지만 실제로는 외부 호스트로 풀리는 요청에 소유자 토큰을 붙여 보내 토큰이 샌다. 마지막으로 /video/:/transcode/universal의 경로 파라미터 제한 누락(CVE-2026-96656)으로 Codecs 디렉터리에 .so나 .dll을 쓸 수 있고, Plex는 스트림 시작 시 이 디렉터리 라이브러리를 서명 검사 없이 dlopen이나 LoadLibrary로 올린다. 개별 결함은 중간 등급이지만, 루프백을 신뢰 경계로 쓴 설계와 코덱 로딩의 무결성 검사 부재가 겹쳐 사전 인증 RCE가 된다.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "재구성, 실제 소스 아님 (SonicWall 글의 예시 줄 기반)",
+          "lang": "cpp",
+          "code": "// /player/timeline 처리\nif (!req.hasHeader(\"X-Plex-Token\")) return 401;  // 존재만 확인, 값 검증 없음\nstd::string protocol = req.param(\"protocol\");     // 스킴 기대, 전체 URL도 통과\nstd::string target = protocol + \"://\" + ip + \":\" + port;\nhttpPost(target, body);  // 서버가 루프백 내부 서비스로 요청"
+        },
+        {
+          "kind": "fix",
+          "label": "재구성, 실제 소스 아님 (1.43.3.10861 수정 방향, 추정)",
+          "lang": "cpp",
+          "code": "if (!auth.validateToken(req.header(\"X-Plex-Token\"))) return 401;  // 토큰 값 검증\nif (protocol != \"http\" && protocol != \"https\") return 400;      // 스킴 허용 목록\nif (isLoopbackOrPrivate(resolve(ip))) return 403;               // 내부 대상 차단\n// 트랜스코더 경로는 Codecs 밖 쓰기 거부"
+        }
+      ],
+      "trigger": "원격 무인증. 32400 포트가 인터넷에 노출된 1.43.2 이하 Plex Media Server(Remote Access, 포트포워딩, UPnP 포함). 체인 후반 단계는 탈취한 소유자 토큰으로 인증된 요청을 쓴다.",
+      "exploitation": "실제 악용됨. 10월 16일 기술 세부, 10월 19일 PoC 공개, 10월 17일부터 허니팟 악용 관측. 흐름은 무인증 SSRF로 내부 서비스 접근, 소유자 토큰 유출, 파일 쓰기로 Codecs에 라이브러리 배치, 트랜스코딩 요청으로 Plex 사용자 권한 코드 실행. 침해 서버에는 암호화폐 채굴기와 프록시가 깔렸다. QNAP은 11월 6일 자사 NAS 사용자 침해 신고를 공지했다. QNAP OS 자체 결함은 아니다.",
+      "patch": "Plex Media Server 1.43.3.10861 이상. SSRF와 파일 쓰기 경로를 막아 체인을 끊는다. 패치 diff는 공개되지 않아 정확한 수정 범위는 확인 못 함. 업데이트만으로 이미 심어진 라이브러리나 변경된 Preferences.xml은 지워지지 않으므로, 노출된 상태로 구버전을 돌렸다면 QNAP 권고대로 재설치, IOC 점검, Plex와 NAS 자격증명 재설정. Remote Access 끄고 32400 포워딩 제거, 원격은 VPN.",
+      "detection": "Plex Codecs 디렉터리의 출처 불명 .so 또는 .dll, Preferences.xml의 TranscoderH264Options 변조, Plex 프로세스가 띄운 낯선 자식 프로세스(보도 예시 이름 myawesomeproxy, mylovelyminer, x12345), 재생 없는데 높은 CPU, proxystream[.]st로 나가는 연결. Windows 설치본이면 Sysmon 이벤트 7(Image loaded)로 Plex Transcoder가 Codecs 경로의 서명 없는 DLL을 로드하는지, 이벤트 1로 Plex 하위 프로세스 트리를 보면 된다(추정, 공식 지침 아님). 침해 판단 지원을 받으려면 Plex Logs 폴더를 삭제 전에 보존. SonicWall IPS 22567, 22568, 22569."
+    },
+    "deepDive": null
+  },
+  {
     "cve": "CVE-2026-96951",
     "date": "2026-11-02",
     "grade": "red",

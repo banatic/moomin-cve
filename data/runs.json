@@ -28,5 +28,11 @@
     "note": "SonicWall SSLVPN SAML 우회 KEV 등재, OpenSSH sshhole 실제 악용 관측으로 red 상향, GPUStack 루프백 자동 관리자 악용(누락분 추가).",
     "count": 2,
     "deepDive": null
+  },
+  {
+    "date": "2026-11-08",
+    "note": "조용한 하루. Plex2Shell 체인에 대해 QNAP이 NAS 침해 신고 공지(11-06)를 내 신규 기록. D-Link DGS-3130 무패치 제로데이와 Android GhostMap 부트루프는 CVE 미할당이라 기록 제외.",
+    "count": 1,
+    "deepDive": null
   }
 ]
