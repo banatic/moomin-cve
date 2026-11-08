@@ -1274,7 +1274,7 @@
     "grade": "green",
     "title": "EKS Network Policy Agent eBPF conntrack 맵 오염",
     "product": "aws-network-policy-agent 1.3.7 미만, VPC CNI 1.22.3 미만",
-    "summary": "같은 노드의 인증된 사용자가 AF_PACKET 프레임으로 eBPF conntrack 맵을 오염시켜 파드 NetworkPolicy 인그레스를 우회할 수 있어. eBPF 상태 맵이 신뢰 경계를 넘는 사례라 연구 관점에서 볼 만해. PoC와 악용 보고는 없어.",
+    "summary": "노드의 모든 파드 TC 프로그램이 공유하는 eBPF conntrack 맵의 키에 '어느 veth에서 기록됐는지'가 없어서, 같은 노드의 파드가 피해 파드 IP를 출발지로 위조한 AF_PACKET 프레임으로 가짜 흐름을 심으면 피해 파드의 인그레스 NetworkPolicy가 그걸 응답 패킷으로 보고 통과시켜. 수정은 키에 skb->ifindex를 넣은 것(2026-05 커밋, v1.3.7). PoC와 악용 보고는 없어.",
     "cvss": 8.7,
     "kev": false,
     "poc": false,
@@ -1283,41 +1283,63 @@
       "eks",
       "ebpf",
       "kubernetes",
+      "conntrack",
       "research"
     ],
     "links": [
       {
-        "label": "TheHackerWire",
-        "url": "https://www.thehackerwire.com/vulnerability/CVE-2026-122266/"
+        "label": "AWS 보안 공지 2026-170-AWS",
+        "url": "https://aws.amazon.com/security/security-bulletins/2026-170-aws/"
+      },
+      {
+        "label": "수정 커밋 8147f19 (Fix conntrack reverse flow bypass, PR 584)",
+        "url": "https://github.com/aws/aws-network-policy-agent/commit/8147f19073605ac06ea2367b3407e35e37d6b83e"
+      },
+      {
+        "label": "GHSA-mm5f-ggvx-hmvw",
+        "url": "https://github.com/aws/aws-network-policy-agent/security/advisories/GHSA-mm5f-ggvx-hmvw"
+      },
+      {
+        "label": "Network Policy Agent v1.3.7 릴리스",
+        "url": "https://github.com/aws/aws-network-policy-agent/releases/tag/v1.3.7"
       },
       {
         "label": "NVD",
         "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-122266"
+      },
+      {
+        "label": "TheHackerWire",
+        "url": "https://www.thehackerwire.com/vulnerability/CVE-2026-122266/"
       }
     ],
-    "history": [],
+    "history": [
+      {
+        "date": "2026-11-09",
+        "note": "심층 설명. 실제 수정 커밋 8147f19 diff 기반으로 detail과 code 갱신(재구성 코드를 실제 발췌로 교체), 수정 커밋과 GHSA 링크 추가."
+      }
+    ],
     "detail": {
-      "rootCause": "CWE-1189(공유 자원의 부적절한 격리). 공격 트래픽으로 만든 AF_PACKET 프레임이 eBPF conntrack 맵에 항목을 남기고, 정책 판단이 그 항목을 허용된 기존 흐름으로 믿는 구조로 설명돼. 맵 키나 BPF 프로그램 이름 등 코드 세부는 AWS 공지를 직접 못 봐서 확인 못 했어.",
-      "trigger": "인접 위치의 인증된 사용자 (AV:A, PR:L), 같은 노드에서 AF_PACKET 프레임을 만들 수 있어야 해.",
-      "exploitation": "conntrack 맵 오염, 인그레스 정책 판단 우회, 같은 노드 파드 접근까지가 공개된 흐름이야. 실제 악용과 PoC 보고 없음.",
-      "patch": "Amazon VPC CNI Managed Add-on 1.22.3 이상 (Network Policy Agent 1.3.7 포함). AWS 공지 2026-170-aws, GHSA-mm5f-ggvx-hmvw.",
-      "detection": "공개된 탐지 지표 없음.",
+      "rootCause": "Network Policy Agent는 파드마다 호스트 쪽 veth의 TC 훅에 handle_ingress, handle_egress 프로그램을 붙이는데, 흐름 상태를 담는 aws_conntrack_map은 v4events.bpf.c에 정의된 노드 전역 1개(BPF_MAP_TYPE_LRU_HASH, 512K 항목, PIN_GLOBAL_NS)를 모든 파드가 공유해. 키 struct conntrack_key는 {src_ip, src_port, dest_ip, dest_port, protocol, owner_ip}뿐이라 이 항목을 '어느 파드의 veth에서 기록했는지'가 없어. owner_ip는 패킷 헤더의 saddr(egress) 또는 daddr(ingress)에서 그대로 가져오니까, 출발지 IP를 위조한 프레임이면 다른 파드 소유 항목을 만들 수 있어. 그리고 handle_ingress는 정방향 키가 없을 때 역방향 키를 찾아서 있으면 pod state 비교도 없이 바로 BPF_OK를 돌려줘. 즉 '공유 상태 맵의 항목은 그 소유 파드의 트래픽이 정책 평가를 통과해서 만든 것'이라는 불변식이 키 설계에서 강제되지 않은 CWE-1189(공유 자원 격리 실패)야.",
+      "trigger": "같은 노드에 스케줄된 파드에서 실행 권한이 있어야 해 (AV:A, PR:L). AF_PACKET 원시 소켓이 필요하니 컨테이너에 CAP_NET_RAW가 있어야 하는데, containerd, Docker 기본 capability 셋에 NET_RAW가 들어 있어서 별도 설정 없이도 대부분 충족돼. 공격 파드의 egress 정책이 위조 흐름을 허용해야 맵에 항목이 써져 (수정 커밋의 통합 테스트도 공격 파드에 egress 허용 정책을 걸고 진행해). 다른 노드의 파드는 해당 없음.",
+      "exploitation": "공격 파드가 피해 파드 IP를 출발지로 위조한 프레임을 자기 veth로 내보내면, 공격 파드 쪽 handle_egress가 owner_ip=피해 파드 IP인 항목을 공유 맵에 기록해. 이후 공격 파드가 그 튜플의 반대 방향으로 피해 파드에 연결하면, 피해 파드 handle_ingress가 만든 역방향 키가 위조 항목과 정확히 일치해서 deny 정책을 건너뛰고 통과돼. 결과는 같은 노드 파드에 대한 인그레스 NetworkPolicy 우회(L3/L4 접근 획득)까지고, 그 자체로 코드 실행은 아니야. 이후 피해는 피해 파드 서비스의 인증 상태에 달려 있어. 실제 악용과 공개 PoC 보고는 없어.",
+      "patch": "커밋 8147f19 (2026-05-22, PR 584 'Fix conntrack reverse flow bypass')가 tc.v4/v6 ingress, egress와 v4/v6events의 conntrack_key에 __u32 ifindex를 추가하고, 정방향, 역방향 키 모두에 skb->ifindex를 넣어. 같은 파드의 ingress, egress 프로그램은 같은 호스트 veth에 붙어 있어 ifindex가 같고, 다른 파드 veth에서 기록된 항목은 키가 달라 매칭되지 않아. Go 쪽 conntrack_client.go의 GC는 netlink conntrack에 ifindex가 없어서 비교할 때 Ifindex=0으로 지우고 5-tuple+owner로만 비교하도록 바뀌었어. 수정 버전은 aws-network-policy-agent 1.3.7 (1.4.x 계열도 포함), VPC CNI Managed Add-on 1.22.3. 수정은 CVE 공개(11-04)보다 약 5개월 먼저 들어간 조용한 패치야. 남는 점: 역방향 키 매칭 시 무조건 BPF_OK인 구조는 v1.3.7에도 그대로라, 같은 veth 안에서의 상태 일관성은 여전히 키 정확성에만 기대 (소스 관찰, 영향 여부는 공개된 분석 없음). AWS 공지상 우회책 없음. 노드 수준 완화로는 신뢰도 다른 워크로드를 노드 분리하거나 파드 securityContext에서 NET_RAW를 drop하는 게 공격 전제를 지워 (추정, 공식 권고 아님).",
+      "detection": "공식 탐지 지표 없음. 관찰 지점(추정): 1) CAP_NET_RAW로 AF_PACKET 소켓(socket(AF_PACKET, SOCK_RAW, ...))을 여는 일반 애플리케이션 컨테이너, Falco나 Tetragon 같은 런타임 센서로 socket 시스템콜 감시. 2) 파드 veth에서 나오는 패킷의 출발지 IP가 그 파드 IP와 다른 경우(스푸핑). 3) NPA 정책 이벤트 로그(policy_events ringbuf 기반 플로 로그)에서 deny-all 대상 파드로 들어온 허용 흐름. 4) bpftool로 aws_conntrack_map을 덤프해 owner_ip와 실제 기록 위치가 맞지 않는 항목 확인(패치 이후 키에는 ifindex가 포함돼 대조 가능).",
       "code": [
         {
           "kind": "vuln",
-          "label": "취약 패턴 (재구성, 실제 소스 아님, 추정)",
+          "label": "aws-network-policy-agent v1.3.5 tc.v4ingress.bpf.c 발췌",
           "lang": "C",
-          "code": "/* 신뢰되지 않은 프레임도 같은 맵에 항목 생성 */\nbpf_map_update_elem(&conntrack, &key, &allow, BPF_ANY);\n/* 인그레스 판단이 맵 항목만 믿음 */\nif (bpf_map_lookup_elem(&conntrack, &key)) return TC_ACT_OK;"
+          "code": "struct conntrack_key {      /* 어느 veth에서 기록했는지 없음 */\n\t__u32 src_ip; __u16 src_port; __u32 dest_ip; __u16 dest_port;\n\t__u8  protocol;\n\t__u32 owner_ip;           /* 패킷 헤더에서 온 값, 위조 가능 */\n};\n/* 노드 전역 공유 맵에서 역방향 흐름이 있으면 정책 평가 없이 통과 */\nreverse_flow_val = bpf_map_lookup_elem(&aws_conntrack_map, &reverse_flow_key);\nif (reverse_flow_val != NULL) return BPF_OK;"
         },
         {
           "kind": "fix",
-          "label": "수정 방향 (재구성, 실제 소스 아님, 추정)",
-          "lang": "C",
-          "code": "/* 정책 판정을 통과한 흐름만 기록 */\nif (policy_allows(&key))\n    bpf_map_update_elem(&conntrack, &key, &allow, BPF_NOEXIST);"
+          "label": "수정 커밋 8147f19 발췌 (v1.3.7)",
+          "lang": "diff",
+          "code": " struct conntrack_key {\n \t__u32 owner_ip;\n+\t__u32 ifindex;\n };\n+\t// ifindex scopes conntrack entries to this pod's veth, preventing cross-pod poisoning\n+\tflow_key.ifindex = skb->ifindex;\n+\treverse_flow_key.ifindex = skb->ifindex; // same veth for both directions in TC"
         }
       ]
     },
-    "deepDive": null
+    "deepDive": "2026-11-09"
   },
   {
     "cve": "CVE-2026-123158",

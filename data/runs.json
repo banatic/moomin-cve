@@ -34,5 +34,11 @@
     "note": "조용한 하루. Plex2Shell 체인에 대해 QNAP이 NAS 침해 신고 공지(11-06)를 내 신규 기록. D-Link DGS-3130 무패치 제로데이와 Android GhostMap 부트루프는 CVE 미할당이라 기록 제외.",
     "count": 1,
     "deepDive": null
+  },
+  {
+    "date": "2026-11-09",
+    "note": "조용한 주말. 수집 기간에 새 CVE, KEV 신규 등재, 새 PoC 확인 안 됨. EKS Network Policy Agent conntrack 맵 오염(CVE-2026-122266) 심층 설명, 실제 수정 커밋 기반으로 detail 갱신.",
+    "count": 0,
+    "deepDive": "CVE-2026-122266"
   }
 ]
