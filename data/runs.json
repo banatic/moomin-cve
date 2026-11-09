@@ -40,5 +40,11 @@
     "note": "조용한 주말. 수집 기간에 새 CVE, KEV 신규 등재, 새 PoC 확인 안 됨. EKS Network Policy Agent conntrack 맵 오염(CVE-2026-122266) 심층 설명, 실제 수정 커밋 기반으로 detail 갱신.",
     "count": 0,
     "deepDive": "CVE-2026-122266"
+  },
+  {
+    "date": "2026-11-10",
+    "note": "CISA KEV 11월 9일 4건 등재. 신규 FreeSWITCH SIP MESSAGE api 프로토콜 명령 실행, IBM Aspera Faspex 관리자 권한 우회. 기존 GPUStack 루프백 자동 관리자, OpenSSH sshhole도 KEV 등재로 갱신. N-able N-central 33개 미패치 취약점 공개는 CVE 미할당이라 기록 제외.",
+    "count": 2,
+    "deepDive": null
   }
 ]

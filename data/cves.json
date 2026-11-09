@@ -237,7 +237,7 @@
     "product": "GPUStack 2.2.0 미만 (LLM 추론 클러스터 관리)",
     "summary": "인증 정보가 없는 요청이라도 출발지가 127.0.0.1이면 첫 관리자 계정으로 처리하는 코드가 기본 활성이었다. 같은 호스트의 리버스 프록시 뒤에 있거나, 게이트웨이 모드에서 X-GPUStack-Real-IP 헤더를 위조하면 원격 무인증 관리자가 된다. 벤더가 2.1.1 배포에서 실제 악용(추론 백엔드로 리버스 셸)을 확인했다. 11월 5일 보도분으로 전날 수집에서 빠져 오늘 추가.",
     "cvss": 9.8,
-    "kev": false,
+    "kev": true,
     "poc": false,
     "tags": [
       "GPUStack",
@@ -245,7 +245,8 @@
       "auth bypass",
       "CWE-290",
       "CWE-346",
-      "reverse proxy"
+      "reverse proxy",
+      "KEV"
     ],
     "links": [
       {
@@ -269,7 +270,12 @@
         "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-102895"
       }
     ],
-    "history": [],
+    "history": [
+      {
+        "date": "2026-11-10",
+        "note": "CISA가 11월 9일 KEV에 등재(카탈로그 2026.11.09). kev를 true로."
+      }
+    ],
     "detail": {
       "rootCause": "gpustack/api/auth.py의 get_current_user()는 Basic, Bearer, API 키, 쿠키 순으로 사용자를 찾고, 아무것도 없으면 client_ip_getter()가 127.0.0.1을 돌려줄 때 is_admin=True인 첫 사용자를 반환했다. force_auth_localhost 기본값이 False라 이 폴백이 기본으로 켜져 있었다. client_ip_getter()는 TCP 피어 주소(request.client.host)를 쓰는데, 같은 호스트의 nginx 같은 리버스 프록시를 거치면 모든 외부 요청의 피어가 127.0.0.1이 된다. 게이트웨이 모드에서는 X-GPUStack-Real-IP 헤더 값을 그대로 출처로 믿는 경로도 있었다. 네트워크 위치를 인증 수단으로 쓴 설계 결함으로 CWE-290, CWE-346에 해당한다.",
       "code": [
@@ -796,6 +802,70 @@
           "code": "@route('/config/import', methods=['POST'])\n@require_admin_session        # 모든 경로에서 인증 강제\ndef import_config():\n    archive = verify_signature(request.files['archive'])  # 출처 검증(방향)\n    restore_backup(archive)"
         }
       ]
+    },
+    "deepDive": null
+  },
+  {
+    "cve": "CVE-2026-116779",
+    "date": "2026-11-10",
+    "grade": "red",
+    "title": "FreeSWITCH SIP MESSAGE의 api 채팅 프로토콜로 임의 API 명령 실행",
+    "product": "SignalWire FreeSWITCH 1.11.2 이하 (오픈소스 VoIP 교환기)",
+    "summary": "SIP MESSAGE의 To 사용자 부분을 '+' 앞은 채팅 프로토콜 이름, 뒤는 주소로 나누는데, 프로토콜 이름에 제한이 없어 mod_dptools가 등록한 api 프로토콜을 고를 수 있었다. api 핸들러는 주소를 FreeSWITCH API 명령으로 그대로 실행하므로 system API를 통해 OS 명령까지 간다. 벤더가 실제 악용을 확인했고 CISA가 11월 9일 KEV에 등재했다.",
+    "cvss": 9.8,
+    "kev": true,
+    "poc": false,
+    "tags": [
+      "FreeSWITCH",
+      "VoIP",
+      "SIP",
+      "command injection",
+      "CWE-77",
+      "KEV"
+    ],
+    "links": [
+      {
+        "label": "Ostorlab 분석 (권고, 커밋 요약)",
+        "url": "https://blog.ostorlab.co/freeswitch-sip-message-rce-cve-2026-116779.html"
+      },
+      {
+        "label": "SecurityOnline 악용 보도",
+        "url": "https://securityonline.info/freeswitch-vulnerability-cve-2026-116779-exploited/"
+      },
+      {
+        "label": "Rescana 정리",
+        "url": "https://www.rescana.com/post/freeswitch-cve-2026-116779-sip-message-rce-prepare-now"
+      },
+      {
+        "label": "KEV 2026.11.09 업데이트 미러",
+        "url": "https://github.com/dgwhited/kev/releases/tag/kev-update-2026-11-09-205314"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-116779"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "mod_sofia의 sofia_presence.c, sofia_presence_handle_sip_i_message()가 인바운드 MESSAGE의 To 사용자를 첫 '+'에서 잘라 왼쪽을 to_proto(채팅 프로토콜), 오른쪽을 to(주소)로 쓴다. 이 to_proto 값은 송신자가 고르는데 허용 목록이 없었다. mod_dptools는 채팅 인터페이스로 event 외에 api를 등록하고, api_chat_send()는 주소를 URL 디코드한 뒤 첫 공백에서 명령과 인자로 나눠 switch_api_execute()에 넘긴다. 즉 메시지 라우팅용 이름 공간과 관리 API 실행 경로 사이에 신뢰 경계가 없었다. 버그 클래스는 명령 주입(CWE-77)이고, system API가 켜져 있으면 OS 명령, mod_lua가 로드돼 있으면 인라인 Lua도 경로가 된다.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "재구성, 실제 소스 아님 (Ostorlab 설명 기반)",
+          "lang": "c",
+          "code": "/* sofia_presence_handle_sip_i_message() */\nif ((p = strchr(to_user, '+'))) {\n    to_proto = to_user; *p++ = '\\0'; to_addr = p; /* 송신자가 프로토콜 선택 */\n}\nswitch_core_chat_send(to_proto, ...);   /* api 포함 아무 프로토콜이나 */\n\n/* mod_dptools api_chat_send() */\nswitch_url_decode(cmd);                 /* 주소를 명령으로 해석 */\nswitch_api_execute(cmd, arg, NULL, &stream); /* 관리 API 실행 */"
+        },
+        {
+          "kind": "fix",
+          "label": "재구성, 실제 소스 아님 (커밋 7015f6a7, PR #3135 설명 기반)",
+          "lang": "c",
+          "code": "if (to_proto && !strcasecmp(to_proto, \"api\") &&\n    !sofia_test_pflag(profile, PFLAG_CHAT_API_PROTO)) { /* enable-chat-api-proto, 기본 off */\n    nua_respond(nh, 403, \"Forbidden\", TAG_END());\n    switch_log_printf(..., \"addressed to the 'api' chat proto\"); /* 출처와 대상 기록 */\n    return;\n}"
+        }
+      ],
+      "trigger": "원격. 조건: 1.11.3 미만, 인바운드 MESSAGE를 받는 SIP 프로필(enable-chat 기본 on, vanilla internal/external 프로필 해당)에 공격자가 도달 가능. auth-messages가 켜져 있어도 등록 계정 하나면 충분하고, 예전 샘플 설정의 비밀번호 없는 default 디렉터리 사용자가 남아 있으면 사실상 무인증. 인바운드 ACL은 MESSAGE에 적용되지 않는다.",
+      "exploitation": "실제 악용됨(SignalWire 권고 GHSA-mg63-h38w-8p9p, CISA KEV 11월 9일). 흐름은 MESSAGE 하나로 FreeSWITCH API 호출, system API로 freeswitch 프로세스 권한(보통 비root 전용 계정)의 명령 실행. 이후 다이얼플랜 변조, 요금 사기용 발신, 자격증명 탈취로 이어질 수 있다(추정). 최초 악용 시점, 규모, 주체는 미공개.",
+      "patch": "1.11.3(2026-08-28 릴리스)에서 프로필별 enable-chat-api-proto 플래그를 추가해 기본 off로 두고, api 프로토콜로 온 MESSAGE는 403으로 거부하고 경고 로그를 남긴다. api 채팅 인터페이스 자체는 제거되지 않고 opt-in 뒤로 숨겨진 것. 권고 공개(10-28)보다 패치 태그가 두 달 먼저 나와 diff로 역추적 가능했다. 임시 완화: 필요 없는 프로필에 enable-chat=false, 비밀번호 없는 디렉터리 사용자 삭제. disable_system_api_commands=true는 system만 막고 경로는 남는다. 같은 권고의 CVE-2026-116785(mod_xml_rpc WebSocket 힙 오버플로), CVE-2026-116790(ICE/STUN 무결성 미검증)은 1.11.2에서 수정.",
+      "detection": "공식 IOC 없음. freeswitch.log에서 To 사용자가 api+ 로 시작하는 MESSAGE 확인, 1.11.3 이후는 \"addressed to the 'api' chat proto\" 경고가 시도 흔적. 패치 전 호스트는 성공 요청이 평범한 MESSAGE 로그만 남길 수 있어 부재가 무죄 증명이 아니다. freeswitch 사용자 아래의 셸 자식 프로세스, 스풀이나 스크립트 디렉터리의 새 파일, 다이얼플랜 변경, 낯선 SIP 등록, CDR의 이상 발신."
     },
     "deepDive": null
   },
@@ -1349,7 +1419,7 @@
     "product": "OpenSSH 10.6p2 미만, musl libc, PAM 미사용 (Alpine 등)",
     "summary": "musl의 crypt()가 실패 때 NULL 대신 문자열 *를 돌려주는데, 비밀번호 없는 계정의 shadow 필드도 *라서 둘이 일치해 버린다. 256바이트를 넘는 비밀번호로 해당 계정 로그인이 가능해진다. glibc나 UsePAM yes는 영향이 없고, 공개 수 시간 만에 허니팟에서 실제 악용이 관측됐다.",
     "cvss": 8.1,
-    "kev": false,
+    "kev": true,
     "poc": true,
     "tags": [
       "OpenSSH",
@@ -1358,7 +1428,8 @@
       "auth bypass",
       "crypt",
       "CWE-394",
-      "in the wild"
+      "in the wild",
+      "KEV"
     ],
     "links": [
       {
@@ -1390,6 +1461,10 @@
       {
         "date": "2026-11-07",
         "note": "Previdian이 공개 9시간 안에 Alpine 허니팟에서 root 획득까지 실제 악용을 관측. 등급 orange에서 red로. CISA KEV는 아직 미등재."
+      },
+      {
+        "date": "2026-11-10",
+        "note": "CISA가 11월 9일 KEV에 등재(카탈로그 2026.11.09). 11-07 기록 시점엔 미등재였음. kev를 true로."
       }
     ],
     "detail": {
@@ -1412,6 +1487,52 @@
       "exploitation": "실제 악용됨(Previdian 관측, CISA KEV 미등재). CVE 공개 9시간 안에 첫 시도, 일본 IP 한 곳에서 8회, 허니팟 한 대에서 root 접근 확인. 공격자는 긴 비밀번호로 로그인 후 비대화형 세션으로 id, uname, hostname 정찰만 수행. GitHub의 PoC들은 검증되지 않았고 악성코드가 섞였을 수 있다는 경고가 있다. 프리미티브는 메모리 손상이 아닌 순수 인증 로직 우회로 곧장 일반 계정 셸이 되고, Alpine 클라우드 이미지(3.18.11~3.24.3)의 기본 사용자는 비밀번호 없는 doas가 있어 root까지 이어진다.",
       "patch": "OpenSSH 10.6p2에서 짧은 저장값을 해시로 취급하지 않게 했다. Alpine 고정 버전: edge 10.6_p2-r0, 3.24 10.3_p1-r2, 3.23 10.2_p1-r1, 3.22 10.0_p1-r11, 3.21 9.9_p2-r1, 3.20 9.7_p1-r6, 3.19 9.6_p1-r3, 3.18 9.3_p2-r4, 3.17 9.1_p1-r7, 3.16 9.0_p1-r6. 업그레이드 후 sshd 재시작 필수. 임시 완화는 PasswordAuthentication no.",
       "detection": "공개된 시그니처 없음. /etc/shadow에서 필드가 *인 계정을 찾고, 그 계정의 Accepted password 로그가 있으면 수상하다. key-only 계정에 비밀번호 로그인 성공 자체가 이상 신호(추정). OpenWrt, Buildroot, Yocto 등 musl 임베디드도 조건 점검. Previdian 관측 IP 89.116.89.18. /var/log/messages의 Accepted password for 중 alpine, root, key-only 계정 항목, 이후 doas 사용과 authorized_keys 변경을 확인. 패키지 업데이트만으로는 sshd가 재시작되지 않는다."
+    },
+    "deepDive": null
+  },
+  {
+    "cve": "CVE-2026-123218",
+    "date": "2026-11-10",
+    "grade": "red",
+    "title": "IBM Aspera Faspex 5 조작 메시지로 관리자 권한 획득",
+    "product": "IBM Aspera Faspex 5.0.0 ~ 5.0.19 (대용량 파일 전송)",
+    "summary": "조작한 메시지로 사용자 권한 검사를 우회해 전체 관리자 권한을 얻는 부적절한 인가(CWE-863) 결함이다. IBM 권고는 11월 7일 공개, CISA가 11월 9일 KEV에 등재했다. 취약 엔드포인트와 기술 세부는 공개되지 않았다.",
+    "cvss": 9.8,
+    "kev": true,
+    "poc": false,
+    "tags": [
+      "IBM",
+      "Aspera Faspex",
+      "authorization bypass",
+      "CWE-863",
+      "file transfer",
+      "KEV"
+    ],
+    "links": [
+      {
+        "label": "IBM 보안 공지 7295921",
+        "url": "https://www.ibm.com/support/pages/node/7295921"
+      },
+      {
+        "label": "HOL Guard 정리 (KEV 날짜)",
+        "url": "https://hol.org/guard/security/cves/CVE-2026-123218-ibm-aspera-faspex-authorization-bypass"
+      },
+      {
+        "label": "KEV 2026.11.09 업데이트 미러",
+        "url": "https://github.com/dgwhited/kev/releases/tag/kev-update-2026-11-09-205314"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-123218"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "IBM 설명은 '인가된 사용자가 특정 메시지를 조작해 사용자 인가를 우회하고 전체 관리자 권한을 얻는다'가 전부이고, CWE-863(Incorrect Authorization)으로 분류된다. 어떤 API, 필드, 역할 검사가 빠졌는지는 공개된 세부 없음. 설명은 인증된 사용자를 전제로 하는데 CVSS 벡터는 PR:N이라 무인증 가능성과 불일치한다. 파일 전송 어플라이언스는 2023년 Faspex 4 YAML 역직렬화(CVE-2022-47986) 때도 랜섬웨어 조직의 표적이었다.",
+      "trigger": "원격. 문서상 인증된 사용자(외부 협력자 계정 포함 가능, 추정)가 필요하지만 CVSS는 PR:N. 5.0.19 PL1 미만의 Faspex 5.",
+      "exploitation": "실제 악용됨(CISA KEV 11월 9일). 결과는 관리자 권한, 즉 모든 패키지와 업로드 파일 열람, 사용자와 설정 변경. 이후 명령 실행으로 이어지는지는 공개된 세부 없음. 공격 주체, 시점, 규모 미공개.",
+      "patch": "5.0.19 PL1(Linux). 컨테이너 배포는 faspex-core 이미지가 5.0.19 (1ce4b13, Fix Pack 1)인지 확인. IBM 공지에 우회책 없음. 패치 변경 내용 미공개.",
+      "detection": "공개 IOC 없음. 감사 로그에서 승인 이력 없는 관리자 승격, 신규 관리자 계정, 일반 계정의 관리 API 호출, 짧은 시간 내 대량 패키지 다운로드 확인."
     },
     "deepDive": null
   },
