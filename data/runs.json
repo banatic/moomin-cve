@@ -52,5 +52,11 @@
     "note": "11월 Patch Tuesday와 CISA KEV 6건(11/10). 신규 Outlook NTLM 해시 유출 제로데이, Chrome libxslt 재진입 UAF 제로데이, Cisco BroadWorks XXE와 Openwave 트랜스코더 KEV 등재, Windows Search와 LDAP 9.8 RCE. Barracuda 체인 2건 KEV 등재로 red 갱신.",
     "count": 6,
     "deepDive": null
+  },
+  {
+    "date": "2026-11-12",
+    "note": "Fortinet 11월 PSIRT CVE 레코드 대량 발행. FortiMail 무인증 RCE 3건(경로 순회, HA join-request 명령 주입, SQLi)과 벤더 지표 E:H가 붙은 인증 SQLi, FortiOS FGSP 설정 동기화 무인증 super admin, FortiManager 무인증 코드 실행(8.0 브랜치 패치 미출시). Chrome 157.0.8103.78 ServiceWorker UAF 샌드박스 밖 Critical. Iperius Backup 고권한 GUI LPE. CISA KEV 신규 없음.",
+    "count": 8,
+    "deepDive": null
   }
 ]
