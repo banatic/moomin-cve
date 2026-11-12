@@ -58,5 +58,11 @@
     "note": "Fortinet 11월 PSIRT CVE 레코드 대량 발행. FortiMail 무인증 RCE 3건(경로 순회, HA join-request 명령 주입, SQLi)과 벤더 지표 E:H가 붙은 인증 SQLi, FortiOS FGSP 설정 동기화 무인증 super admin, FortiManager 무인증 코드 실행(8.0 브랜치 패치 미출시). Chrome 157.0.8103.78 ServiceWorker UAF 샌드박스 밖 Critical. Iperius Backup 고권한 GUI LPE. CISA KEV 신규 없음.",
     "count": 8,
     "deepDive": null
+  },
+  {
+    "date": "2026-11-13",
+    "note": "CISA KEV 신규 없음. 7-Zip LZX CAB 힙 쓰기 PoC 표기(26.06에서 _pos 리셋), Synology DSM 무인증 SQLi 9.8 포함 27건, NetScaler Console 무인증 인증 우회, PostgreSQL 정기 릴리스 CVE 50여 건(tsvector_delete 힙 오버플로, pg_restore 조작 아카이브, plperl 재진입 UAF), Payara 관리 REST 인증 우회, N-central Able2Shell CVE 정리, ScreenConnect RMM+ 확장 기본 비밀값, gitoxide UNC 심볼릭 링크 NTLM 유출.",
+    "count": 10,
+    "deepDive": null
   }
 ]
