@@ -64,5 +64,11 @@
     "note": "CISA KEV 신규 없음. 7-Zip LZX CAB 힙 쓰기 PoC 표기(26.06에서 _pos 리셋), Synology DSM 무인증 SQLi 9.8 포함 27건, NetScaler Console 무인증 인증 우회, PostgreSQL 정기 릴리스 CVE 50여 건(tsvector_delete 힙 오버플로, pg_restore 조작 아카이브, plperl 재진입 UAF), Payara 관리 REST 인증 우회, N-central Able2Shell CVE 정리, ScreenConnect RMM+ 확장 기본 비밀값, gitoxide UNC 심볼릭 링크 NTLM 유출.",
     "count": 10,
     "deepDive": null
+  },
+  {
+    "date": "2026-11-14",
+    "note": "CISA KEV 신규 2건(11/13): UnrealIRCd labeled-response label 태그 구분자 주입으로 서버 권한 S2S 명령, Check Point Gaia DynamicCLI 월드 쓰기 소켓 root LPE. NetScaler ADC, Gateway 메모리 오버플로 28건 레코드 발행, Tactical RMM 보고서 file:// 읽기에서 SECRET_KEY 재사용으로 전 에이전트 명령. N-central Hotfix 2 우회 체인 악용 보도(변화).",
+    "count": 4,
+    "deepDive": null
   }
 ]

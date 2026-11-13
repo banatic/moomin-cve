@@ -343,6 +343,62 @@
     "deepDive": null
   },
   {
+    "cve": "CVE-2026-107412",
+    "date": "2026-11-14",
+    "grade": "orange",
+    "title": "NetScaler ADC, Gateway 11월 메모리 오버플로 28건 묶음",
+    "product": "Citrix NetScaler ADC, Gateway 14.1-73.57, 13.1-64.39 미만 (FIPS 14.1-73.58, FIPS/NDcPP 13.1-37.293 미만)",
+    "summary": "Citrix 권고 CTX697305로 NetScaler ADC, Gateway의 메모리 오버플로 계열 CVE 28건 레코드가 11월 13일 한꺼번에 발행됐어. 이 항목은 CVSS 4.0 9.5로 가장 높은 대표 건이고, ICA proxy, Email OTP, EPA, DoH, 패킷 처리 등 무인증 경로 9.3짜리가 여럿이야. 벤더 문구는 '예측 불가 동작 또는 DoS'까지만이고 악용, PoC는 확인 못 했어.",
+    "cvss": 9.5,
+    "kev": false,
+    "poc": false,
+    "tags": [
+      "citrix",
+      "netscaler",
+      "gateway",
+      "memory-corruption",
+      "dos",
+      "bulk-advisory"
+    ],
+    "links": [
+      {
+        "label": "Citrix CTX697305",
+        "url": "https://support.citrix.com/support-home/kbsearch/article?articleNumber=CTX697305"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-107412"
+      },
+      {
+        "label": "CVE.org",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-107412"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "CVE 레코드는 'Multiple Memory overflow vulnerabilities'라고만 적었고 CWE가 비어 있어. 같은 권고의 다른 레코드는 ICA proxy(CVE-2026-120864), Email OTP(CVE-2026-107415), EPA(CVE-2026-111334), DoH(CVE-2026-107408, 107409), SMPP(107407), NetScaler Push(107410), 패킷 처리(120868) 등 기능별로 쪼개져 있고 대부분 무인증 원격 벡터야. 패킷 파서가 길이 필드를 믿고 고정 버퍼에 복사하는 전형적 패턴일 가능성이 높지만, 구체 함수나 구조체는 공개된 세부 없음 (추정).",
+      "trigger": "원격, 무인증(대표 건은 AT:P로 특정 구성 전제가 있음). 각 CVE는 해당 기능(Gateway, AAA 가상 서버, DNS, ICA proxy 등)이 켜져 있어야 노출돼.",
+      "exploitation": "이론상 가능. 벤더 설명은 DoS 중심이지만 9.3짜리 다수가 VC:H/VI:H/VA:H라서 Citrix도 메모리 손상 이상의 영향을 배제하지 않은 걸로 읽혀 (추정). NetScaler는 CitrixBleed 이후 패치 공개 직후 diff 분석으로 악용이 붙은 전례가 많아.",
+      "patch": "14.1-73.57, 13.1-64.39 이상(FIPS 14.1-73.58, FIPS/NDcPP 13.1-37.293). 어제 기록한 NetScaler Console 권고(CVE-2026-120869)와 같은 시기에 나온 ADC/Gateway 수정 빌드야. 기능별로 쪼개져 있어서 해당 기능만 끄는 완화는 현실성이 낮고 빌드 업데이트가 답이야.",
+      "detection": "공개 IoC 없음. nsppe 코어 덤프(/var/core), 예상치 못한 재부팅, ns.log의 패킷 엔진 재시작 기록이 첫 신호야. 크래시가 반복되면 패치 diff 기반 퍼징이나 스캔이 시작된 걸로 봐.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "길이 필드 신뢰 복사 (재구성, 실제 소스 아님, 근거 약함, 추정)",
+          "lang": "C",
+          "code": "uint16_t n = ntohs(hdr->len);      // 패킷이 준 길이\nmemcpy(ctx->buf, hdr->data, n);     // ctx->buf 크기와 비교 없음"
+        },
+        {
+          "kind": "fix",
+          "label": "버퍼 크기와 남은 패킷 길이로 이중 제한 (재구성, 실제 소스 아님)",
+          "lang": "C",
+          "code": "if (n > sizeof(ctx->buf) || n > pkt_remaining(p))\n    return drop(p);                 // 초과 시 폐기\nmemcpy(ctx->buf, hdr->data, n);"
+        }
+      ]
+    },
+    "deepDive": null
+  },
+  {
     "cve": "CVE-2026-107441",
     "date": "2026-11-06",
     "grade": "red",
@@ -923,6 +979,74 @@
           "label": "수정 방향 (재구성, 실제 소스 아님, 추정)",
           "lang": "C",
           "code": "// 호출자 엔타이틀먼트 확인 후, 무작위 이름과 배타적 생성으로 고정\nint fd = openat(dirfd, name, O_CREAT | O_EXCL | O_NOFOLLOW, 0600);\n// fstat으로 st_nlink == 1 확인, 이후 fd 기준으로만 복사"
+        }
+      ]
+    },
+    "deepDive": null
+  },
+  {
+    "cve": "CVE-2026-114713",
+    "date": "2026-11-14",
+    "grade": "red",
+    "title": "UnrealIRCd label 태그 미이스케이프로 서버 권한 명령 주입",
+    "product": "UnrealIRCd 6.0.0 이상 6.2.7.1 미만 (서버 2대 이상 링크된 네트워크)",
+    "summary": "labeled-response 모듈이 IRCv3 label 메시지 태그 값을 검사 없이 받아 응답과 서버 간 메시지에 그대로 끼워 넣어서, 일반 사용자가 공백이나 CR/LF를 넣어 서버 간(S2S) 명령을 서버 권한으로 실행시킬 수 있어. 메인테이너가 커밋 메시지에 직접 CRITICAL로 적었고, CISA가 11월 13일 KEV에 넣었어(실제 악용). 공개 PoC는 확인 못 했어.",
+    "cvss": 8.6,
+    "kev": true,
+    "poc": false,
+    "tags": [
+      "unrealircd",
+      "irc",
+      "delimiter-injection",
+      "s2s",
+      "cwe-140",
+      "kev"
+    ],
+    "links": [
+      {
+        "label": "UnrealIRCd 포럼 공지",
+        "url": "https://forums.unrealircd.org/viewtopic.php?t=9487"
+      },
+      {
+        "label": "unrealircd 커밋 05b5f5f",
+        "url": "https://github.com/unrealircd/unrealircd/commit/05b5f5fdc8bbb726298f38c22e262e3c833d4986"
+      },
+      {
+        "label": "CISA KEV",
+        "url": "https://www.cisa.gov/known-exploited-vulnerabilities-catalog?field_cve=CVE-2026-114713"
+      },
+      {
+        "label": "oss-security",
+        "url": "https://seclists.org/oss-sec/2026/q4/576"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-114713"
+      },
+      {
+        "label": "CVE.org",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-114713"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "src/modules/labeled-response.c의 labeled_response_mtag_is_ok()는 클라이언트가 보낸 label 태그가 허용되는지만 보고, 값의 문자 집합은 검사하지 않았어(일반 사용자는 길이 64 이하만 확인). 저장된 label은 currentcmd.label에 strlcpy된 뒤 \"@label=%s :%s BATCH ...\" 같은 snprintf 포맷에 그대로 들어가고, 원격 서버로 전파되는 메시지 태그에도 실려. IRC 프로토콜에서 공백은 필드 구분자, CR/LF는 메시지 구분자, 세미콜론은 태그 구분자라서, 이 문자가 이스케이프 없이 들어가면 한 줄이 여러 메시지로 쪼개져. 깨진 불변식은 '태그 값은 한 메시지의 한 필드 안에 갇힌다'는 것이고, 버그 클래스는 구분자 미중화(CWE-140)야. 받는 쪽 서버는 링크된 서버에서 온 줄을 서버 권한으로 처리하니까 사용자 입력이 서버 명령이 돼.",
+      "trigger": "원격, 무인증 수준. IRC 서버에 접속한 아무 사용자나 가능하고, labeled-response와 batch CAP을 협상하면 돼. 단 서버가 2대 이상 링크된 네트워크여야 S2S 명령 주입이 성립해 (단일 서버는 레코드 기준 해당 없음).",
+      "exploitation": "실제 악용됨(CISA KEV, SSVC Exploitation active). 주입된 줄이 링크 상대 서버에서 서버 출처 명령으로 해석되므로, 운영자 권한이 필요한 동작(사용자 강제 퇴장, 모드 변경, IRCOp 권한 부여 등)을 일반 사용자가 대신 일으킬 수 있어. 커밋 제목이 'anyone could execute commands as server/IRCOp'야.",
+      "patch": "6.2.7.1에서 labeled_response_mtag_is_ok() 맨 앞에 strpbrk(value, \" ;\\\\\\r\\n\") 검사를 넣어 공백, 세미콜론, 역슬래시, CR, LF가 있으면 태그 자체를 거부해. 서버에서 온 태그(IsServer)도 이 검사를 먼저 거치게 순서를 잡았어. 입력 단계에서 막는 방식이라 다른 모듈이 태그 값을 다시 출력하는 경로도 같이 덮여. 임시 완화는 labeled-response 모듈 언로드지만 업데이트가 우선이야.",
+      "detection": "서버 로그에서 일반 사용자 메시지 직후 링크 상대 서버 출처로 기록된 예상 밖 SVSMODE, KILL, 권한 변경 이벤트를 찾아. 클라이언트 입력 원문 로그가 있으면 @label= 태그 값에 공백이나 \\r\\n이 들어간 줄이 직접 지표야. 공개 IoC 목록은 확인 못 했어.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "unrealircd labeled-response.c 6.2.7 이전 (커밋 05b5f5f 이전 상태 발췌)",
+          "lang": "C",
+          "code": "int labeled_response_mtag_is_ok(Client *client, const char *name, const char *value)\n{\n\tif (BadPtr(value))\n\t\treturn 0;\n\tif (IsServer(client))\n\t\treturn 1; // 문자 집합 검사 없음\n\t/* ... 일반 사용자는 strlen(value) <= 64 만 확인 */\n}\n/* 이후 snprintf(buf, ..., \"@label=%s :%s BATCH +%s ...\", currentcmd.label, ...) 로 그대로 출력 */"
+        },
+        {
+          "kind": "fix",
+          "label": "unrealircd 커밋 05b5f5f 발췌",
+          "lang": "C",
+          "code": "\tif (BadPtr(value))\n\t\treturn 0;\n\n+\tif (strpbrk(value, \" ;\\\\\\r\\n\")) // IRC 필드, 태그, 메시지 구분자 차단\n+\t\treturn 0;\n\n\tif (IsServer(client))\n\t\treturn 1;"
         }
       ]
     },
@@ -1952,6 +2076,76 @@
     "deepDive": "2026-11-09"
   },
   {
+    "cve": "CVE-2026-123039",
+    "date": "2026-11-14",
+    "grade": "red",
+    "title": "Check Point Gaia DynamicCLI 월드 쓰기 소켓으로 root 명령 실행",
+    "product": "Check Point Quantum Security Gateway, Security Management (R81.20 JHF Take 173 이하, R82 Take 130 이하, R82.10 Take 50 이하, R82.20 Take 10 이하)",
+    "summary": "Gaia OS의 DynamicCLI 데몬이 root로 돌면서 /tmp/dynamic_socket을 누구나 쓸 수 있는 권한으로 열고, 접속한 프로세스를 인증하지 않아. 그래서 로컬 저권한 사용자가 소켓에 명령을 보내면 root로 실행돼. CISA KEV 11월 13일 등재(실제 악용), Check Point 블로그는 PHP2Shell 악용과 함께 LPE로 언급했어.",
+    "cvss": 7.8,
+    "kev": true,
+    "poc": true,
+    "tags": [
+      "check-point",
+      "gaia",
+      "lpe",
+      "unix-socket",
+      "cwe-732",
+      "cwe-862",
+      "kev",
+      "firewall"
+    ],
+    "links": [
+      {
+        "label": "Check Point sk1000362",
+        "url": "https://support.checkpoint.com/results/sk/sk1000362"
+      },
+      {
+        "label": "Check Point 블로그 (PHP2Shell, LPE 악용)",
+        "url": "https://blog.checkpoint.com/security/security-advisory-active-exploitation-of-php2shell-and-local-privilege-escalation/"
+      },
+      {
+        "label": "CISA KEV",
+        "url": "https://www.cisa.gov/known-exploited-vulnerabilities-catalog?field_cve=CVE-2026-123039"
+      },
+      {
+        "label": "Sploitus (GitHub PoC 목록)",
+        "url": "https://sploitus.com/exploit?id=68AA9CC6-D55E-575B-BE5E-D4EA0A78502A"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-123039"
+      },
+      {
+        "label": "CVE.org",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-123039"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "Gaia OS의 DynamicCLI 데몬이 root 권한으로 실행되면서 /tmp/dynamic_socket 경로에 유닉스 도메인 소켓을 만들고, 파일 모드를 world-writable로 둔 게 첫 번째 결함이야(CWE-732). 유닉스 소켓은 connect()에 소켓 파일 쓰기 권한이 필요하니 이 모드면 시스템의 모든 로컬 사용자가 접속할 수 있어. 두 번째 결함은 데몬이 접속한 상대를 SO_PEERCRED 같은 수단으로 확인하지 않고 받은 명령을 그대로 실행한다는 점이야(CWE-862). 깨진 불변식은 'root 서비스의 명령 채널은 root 또는 허가된 그룹만 연다'는 것. 프로토콜 형식과 함수 이름은 공개된 세부 없음.",
+      "trigger": "로컬, 저권한 인증 사용자. 게이트웨이나 관리 서버에 셸을 가진 아무 계정이면 돼. 원격 공격자는 웹 취약점 등으로 저권한 코드 실행을 먼저 얻은 뒤 이걸로 root까지 올리는 2단계 구성이 현실적이야.",
+      "exploitation": "실제 악용됨(CISA KEV, SSVC Exploitation active). Check Point 블로그 제목상 PHP2Shell 악용과 묶여 언급돼서, 웹 계층 침투 후 권한 상승 단계로 쓰인 것으로 보여 (추정, 연결 세부 확인 못 함). root를 얻으면 방화벽 정책, VPN 키, 관리 서버의 하위 게이트웨이 제어까지 넘어가. 검색 결과에 GitHub PoC 저장소(googlesky/CVE-2026-123039)가 잡혔지만 내용은 확인 안 했어.",
+      "patch": "Jumbo Hotfix 상위 Take로 수정(R81.20 Take 174 이상, R82 Take 131 이상, R82.10 Take 51 이상, R82.20 Take 11 이상으로 해석, sk1000362 확인 필요). 수정 방식(소켓 권한 축소, 피어 자격 확인)은 공개된 세부 없음. KEV 기한은 2026-11-16이고 CISA가 포렌식 트리아지 대상으로 지정했어.",
+      "detection": "ls -l /tmp/dynamic_socket 권한 확인(srwxrwxrwx면 취약 상태). 감사 로그(auditd)로 /tmp/dynamic_socket에 connect하는 비root 프로세스, DynamicCLI 데몬의 자식으로 생기는 셸 프로세스 트리를 찾아. 웹 서버 사용자(httpd 계열) 프로세스가 이 소켓에 접근하면 침투 후 상승 지표야.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "root 데몬의 월드 쓰기 소켓, 피어 미검증 (재구성, 실제 소스 아님)",
+          "lang": "C",
+          "code": "bind(fd, (struct sockaddr *)&addr, len);   // addr.sun_path = \"/tmp/dynamic_socket\"\nchmod(\"/tmp/dynamic_socket\", 0777);        // 모든 로컬 사용자가 connect 가능\nint c = accept(fd, NULL, NULL);\nread(c, cmd, sizeof(cmd));\nrun_clish_command(cmd);                       // 누가 보냈는지 확인 없이 root로 실행"
+        },
+        {
+          "kind": "fix",
+          "label": "권한 축소와 SO_PEERCRED 검사 (재구성, 실제 소스 아님)",
+          "lang": "C",
+          "code": "chmod(path, 0600);                           // root 전용 (보호 디렉터리로 이동 권장)\nstruct ucred cr; socklen_t l = sizeof(cr);\ngetsockopt(c, SOL_SOCKET, SO_PEERCRED, &cr, &l);\nif (cr.uid != 0) { close(c); return; }     // 상대 프로세스 uid 확인"
+        }
+      ]
+    },
+    "deepDive": null
+  },
+  {
     "cve": "CVE-2026-123158",
     "date": "2026-11-06",
     "grade": "red",
@@ -2369,9 +2563,22 @@
       {
         "label": "CVE.org",
         "url": "https://www.cve.org/CVERecord?id=CVE-2026-125883"
+      },
+      {
+        "label": "SecurityWeek 4EverAble2Shell",
+        "url": "https://www.securityweek.com/hackers-exploit-new-n-central-zero-day-hours-after-poc-publication/"
+      },
+      {
+        "label": "The Hacker News 패치 우회 체인",
+        "url": "https://thehackernews.com/2026/11/new-n-central-exploits-work-against.html"
       }
     ],
-    "history": [],
+    "history": [
+      {
+        "date": "2026-11-14",
+        "note": "Hotfix 2 적용 서버에도 통한다는 새 체인 4EverAble2Shell(및 Windows 에이전트 SYSTEM 체인)이 공개됐고, PoC 공개 몇 시간 만에 악용됐다는 보도. N-able은 레거시 API 비활성화를 권고. 새 체인의 CVE 번호와 CISA KEV 등재는 확인 못 함."
+      }
+    ],
     "detail": {
       "rootCause": "N-central의 XML 처리 지점 여러 곳에서 외부 엔티티 참조를 막지 않은 CWE-611이야(CVSS 4.0 9.3, 무인증). 벤더 권고 제목이 'Multiple XXE'라 하나가 아닌 여러 엔드포인트가 같은 패턴이야. 구체적 엔드포인트 이름은 이 검색 범위에선 확인 못 함.",
       "trigger": "원격, 무인증. N-central 서버의 XML을 받는 엔드포인트에 접근 가능하면 돼.",
@@ -2856,6 +3063,74 @@
           "label": "안전한 설정 (재구성, 실제 소스 아님)",
           "lang": "ini",
           "code": "[RMMPlus]\nApiSecret = <설치마다 무작위 생성한 긴 값>  ; 교체 후 기존 연동 재등록"
+        }
+      ]
+    },
+    "deepDive": null
+  },
+  {
+    "cve": "CVE-2026-129165",
+    "date": "2026-11-14",
+    "grade": "orange",
+    "title": "Tactical RMM 보고서 미리보기 file:// 읽기로 전 에이전트 명령 실행",
+    "product": "Tactical RMM 0.17.0 ~ 1.6.1 (보고서 기능, 수정 릴리스 미확인)",
+    "summary": "보고서 템플릿 미리보기에서 WeasyPrint가 사용자 마크다운의 file:// 링크를 따라가 서버 파일을 PDF에 넣어 돌려줘. 보고서 관리 권한만 있으면 Django SECRET_KEY를 읽을 수 있는데, 이게 NATS 비밀번호로 재사용돼서 모든 관리 에이전트에 runscript 명령을 보낼 수 있어. 1.6.1이 최신이라 수정 릴리스는 확인 못 했고, PoC 공개 여부도 확인 못 했어.",
+    "cvss": 9.4,
+    "kev": false,
+    "poc": false,
+    "tags": [
+      "tactical-rmm",
+      "rmm",
+      "file-read",
+      "weasyprint",
+      "secret-reuse",
+      "nats"
+    ],
+    "links": [
+      {
+        "label": "VulnCheck 권고",
+        "url": "https://www.vulncheck.com/advisories/tactical-rmm-0.17.0-through-1.6.1-arbitrary-file-read-via-report-preview"
+      },
+      {
+        "label": "발견자 글",
+        "url": "https://vul.yulun.ac.cn/20261028/tacticalrmm/"
+      },
+      {
+        "label": "취약 코드 reporting/utils.py",
+        "url": "https://github.com/amidaware/tacticalrmm/blob/086e2d9714b1716796722c7e0c19a1ebe08a39f2/api/tacticalrmm/ee/reporting/utils.py#L110-L117"
+      },
+      {
+        "label": "NATS 설정 utils.py",
+        "url": "https://github.com/amidaware/tacticalrmm/blob/086e2d9714b1716796722c7e0c19a1ebe08a39f2/api/tacticalrmm/tacticalrmm/utils.py#L227-L236"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-129165"
+      },
+      {
+        "label": "CVE.org",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-129165"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "ee/reporting/utils.py의 generate_pdf()가 HTML(string=html).write_pdf()를 url_fetcher 지정 없이 호출해서, WeasyPrint 기본 fetcher가 file:// URL도 열어. /reporting/templates/preview/ 엔드포인트는 사용자가 넣은 template_md를 HTML로 렌더한 뒤 이 함수로 PDF를 만들기 때문에, 템플릿 안의 이미지나 첨부 링크가 서버 로컬 파일을 가리키면 그 내용이 PDF에 박혀 돌아와(CWE-73). 피해가 커지는 건 두 번째 설계 결함 때문이야: tacticalrmm/utils.py가 NATS 설정을 만들 때 tacticalrmm 계정 비밀번호로 settings.SECRET_KEY를 그대로 쓰고 publish 권한을 '>'(전체)로 줘. 그래서 파일 읽기 하나가 Django 세션 서명 키 유출이자 에이전트 명령 버스 장악이 돼.",
+      "trigger": "원격, 인증 필요(보고서 관리 권한, CVSS PR:H). Enterprise 보고서 기능이 활성화된 인스턴스.",
+      "exploitation": "이론상 가능(CISA SSVC Exploitation none). 파일 읽기로 SECRET_KEY를 얻고, NATS에 tacticalrmm 계정으로 붙어 cmd 주제로 publish하면 관리 중인 모든 Windows, Linux 에이전트에서 스크립트가 SYSTEM/root로 실행돼. RMM 특성상 영향 범위가 서버 한 대가 아니라 관리 대상 전체야.",
+      "patch": "git으로 확인한 범위에서 v1.6.1(086e2d9) 이후 develop 브랜치에 관련 수정 커밋은 아직 없어(kombu 고정 커밋만 있음). 임시 완화는 보고서 관리 권한을 최소 인원으로 줄이고, 보고서 기능을 안 쓰면 끄는 것. 근본 수정은 url_fetcher로 file:// 차단, NATS 비밀번호를 SECRET_KEY와 분리하는 두 갈래가 필요해 (추정).",
+      "detection": "Django 접근 로그에서 /reporting/templates/preview/ 요청 본문에 file:// 문자열이 들어간 건. NATS 서버 로그에서 평소와 다른 원격 IP의 tacticalrmm 계정 접속. 에이전트 쪽은 tacticalrmm 에이전트 서비스 자식으로 생긴 powershell.exe, cmd.exe 프로세스 트리(Sysmon 이벤트 1)를 관리자 작업 기록과 대조해.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "amidaware/tacticalrmm v1.6.1 ee/reporting/utils.py, tacticalrmm/utils.py 발췌",
+          "lang": "Python",
+          "code": "def generate_pdf(*, html: str, css: str = \"\") -> bytes:\n    pdf_bytes = HTML(string=html).write_pdf(  # 기본 fetcher: file:// 허용\n        stylesheets=[CSS(string=css, font_config=font_config)], font_config=font_config)\n\n# NATS 계정 설정\n\"password\": settings.SECRET_KEY,  # Django 키를 NATS 비밀번호로 재사용\n\"permissions\": {\"publish\": \">\", \"subscribe\": \">\"},"
+        },
+        {
+          "kind": "fix",
+          "label": "수정 방향 (재구성, 실제 소스 아님)",
+          "lang": "Python",
+          "code": "def safe_fetcher(url, *a, **k):\n    if not url.startswith((\"http://\", \"https://\", \"data:\")):\n        raise ValueError(\"blocked scheme\")   # file:// 차단\n    return default_url_fetcher(url, *a, **k)\nHTML(string=html, url_fetcher=safe_fetcher).write_pdf(...)\n\"password\": settings.NATS_PASSWORD,          # 별도 비밀값"
         }
       ]
     },
