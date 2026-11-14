@@ -3137,6 +3137,262 @@
     "deepDive": null
   },
   {
+    "cve": "CVE-2026-129255",
+    "date": "2026-11-15",
+    "grade": "green",
+    "title": "CoolerMaster MasterPlus+ 번들 WinRing0x64.sys 물리 메모리 접근 권한 결함",
+    "product": "CoolerMaster MASTERPLUS+ 1.9.6 (WinRing0x64.sys)",
+    "summary": "주변기기 RGB 유틸리티에 번들된 WinRing0x64.sys가 PhysicalAddress 인자를 받는 IOCTL 처리 함수(sub_11504)를 저권한 사용자에게 열어 둔 문제로 VulDB가 CVE를 붙였어. WinRing0 계열은 원래 물리 메모리, MSR, I/O 포트 접근을 주는 드라이버라 BYOVD와 LPE 재료로 잘 알려져 있어. 벤더는 무응답이고 패치 정보 없음.",
+    "cvss": 6.8,
+    "kev": false,
+    "poc": false,
+    "tags": [
+      "windows",
+      "driver",
+      "byovd",
+      "winring0",
+      "physical-memory",
+      "lpe"
+    ],
+    "links": [
+      {
+        "label": "VulDB 437286",
+        "url": "https://vuldb.com/vuln/437286"
+      },
+      {
+        "label": "VulDB CVE 페이지",
+        "url": "https://vuldb.com/cve/CVE-2026-129255"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-129255"
+      },
+      {
+        "label": "CVE.org",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-129255"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "CVE 레코드 기준으로 WinRing0x64.sys의 sub_11504가 사용자 제공 PhysicalAddress 인자를 처리하는데, 디바이스 객체 접근 제어가 느슨해(CWE-276, CWE-266) 저권한(PR:L) 사용자가 이 IOCTL을 부를 수 있어. 물리 주소를 매핑해 읽고 쓰는 기능 자체가 설계상 커널 경계를 무시하는 프리미티브라, 접근 제어가 유일한 방어선인데 그게 빠진 구조야. 함수 이름이 sub_ 형태인 걸 보면 리포터가 심볼 없이 리버싱한 결과로 보여(추정). 세부 IOCTL 코드와 SDDL은 공개 자료에서 확인 못 함.",
+      "trigger": "로컬, 일반 사용자 권한. MasterPlus+가 설치돼 드라이버가 로드돼 있거나, 공격자가 드라이버 파일을 직접 가져와 로드하는 BYOVD 시나리오(이 경우는 관리자 권한 필요).",
+      "exploitation": "물리 메모리 임의 읽기/쓰기는 개념상 커널 구조체(토큰 등) 변조로 SYSTEM 권한, 또는 EDR 콜백 제거 같은 커널 수준 조작으로 이어질 수 있는 프리미티브야. 이 CVE에 대한 공개 PoC와 악용 보고는 확인 못 함.",
+      "patch": "벤더 무응답, 수정 버전 없음. 완화책은 해당 유틸리티 제거, Microsoft 취약 드라이버 차단 목록(HVCI, WDAC) 적용 여부 확인. Defender가 WinRing0 드라이버를 HackTool로 탐지해 온 사례가 있어 업데이트 상태도 확인할 만해.",
+      "detection": "Sysmon 이벤트 ID 6(드라이버 로드)에서 WinRing0x64.sys 로드와 서명, 해시 확인. Microsoft-Windows-Kernel-PnP 및 서비스 생성(System 로그 7045)으로 커널 드라이버 서비스 등록 감시. 사용자 프로세스가 \\\\.\\WinRing0_* 디바이스 핸들을 여는 것도 지표(장치 이름은 일반적인 WinRing0 기준, 이 빌드에서 확인 못 함).",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "재구성, 실제 소스 아님 (추정)",
+          "lang": "C",
+          "code": "/* 디바이스 생성 시 보안 기술자 없이 생성 -> 일반 사용자도 핸들 획득 */\nIoCreateDevice(drv, 0, &name, FILE_DEVICE_UNKNOWN, 0, FALSE, &dev);\n...\ncase IOCTL_READ_PHYS: /* 사용자가 준 PhysicalAddress를 그대로 매핑 */\n    va = MmMapIoSpace(in->PhysicalAddress, in->Size, MmNonCached);"
+        },
+        {
+          "kind": "fix",
+          "label": "재구성, 실제 소스 아님 (수정 방향)",
+          "lang": "C",
+          "code": "/* 관리자, SYSTEM만 열 수 있도록 SDDL 지정 */\nIoCreateDeviceSecure(drv, 0, &name, FILE_DEVICE_UNKNOWN,\n    FILE_DEVICE_SECURE_OPEN, FALSE,\n    &SDDL_DEVOBJ_SYS_ALL_ADM_ALL, NULL, &dev);\n/* 그리고 매핑 가능 범위를 장치 MMIO 영역으로 한정 */"
+        }
+      ]
+    },
+    "deepDive": null
+  },
+  {
+    "cve": "CVE-2026-129261",
+    "date": "2026-11-15",
+    "grade": "green",
+    "title": "Kingston FURY CTRL 번들 NTIOLib_X64.sys IOCTL 접근 제어 부재",
+    "product": "Kingston FURY CTRL RGB Control Software 2.0.66.0 이하 (NTIOLib_X64.sys)",
+    "summary": "메모리 RGB 제어 프로그램이 번들한 NTIOLib_X64.sys의 IOCTL 핸들러가 접근 제어 없이 노출돼 있다는 VulDB 등록 CVE야. NTIOLib는 MSI 유틸리티에서 오래 쓰이며 물리 메모리, 포트 I/O 접근 문제로 여러 번 보고된 드라이버 계열이고, Kingston은 올해 NTIOLib_KSFX.sys로 CVE-2026-19381도 받았어. CVSS 벡터는 PR:H라 LPE보다는 관리자에서 커널로 넘어가는 BYOVD 재료로 보는 게 맞아.",
+    "cvss": 8.2,
+    "kev": false,
+    "poc": false,
+    "tags": [
+      "windows",
+      "driver",
+      "byovd",
+      "ntiolib",
+      "ioctl"
+    ],
+    "links": [
+      {
+        "label": "VulDB 437302",
+        "url": "https://vuldb.com/vuln/437302"
+      },
+      {
+        "label": "VulDB CVE 페이지",
+        "url": "https://vuldb.com/cve/CVE-2026-129261"
+      },
+      {
+        "label": "관련 CVE-2026-19381 (NVD)",
+        "url": "https://nvd.nist.gov/vuln/detail/cve-2026-19381"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-129261"
+      },
+      {
+        "label": "CVE.org",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-129261"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "NTIOLib_X64.sys의 IOCTL 핸들러가 호출자 검증 없이 하드웨어 접근 기능을 노출한다는 게 CVE 레코드 내용이야(CWE-782). 어떤 IOCTL이 무엇을 하는지(물리 메모리, MSR, 포트 I/O 등)는 이 레코드에 안 나와. 같은 이름 계열 드라이버가 과거 MSI 제품에서 물리 메모리 접근 LPE로 보고된 이력이 있어 유사 기능일 가능성이 높아(추정). 영향 버전이 2.0.0부터 2.0.66.0까지 전부라 처음부터 같은 드라이버를 쓴 것으로 보여.",
+      "trigger": "로컬. CVSS 벡터가 PR:H라 관리자 권한이 전제돼. 즉 관리자에서 커널 코드 수준 조작(서명 정책 우회, EDR 무력화)으로 넘어가는 BYOVD 시나리오가 주 위험이야.",
+      "exploitation": "개념상 서명된 정상 드라이버를 로드해 커널 메모리 조작 프리미티브를 얻는 BYOVD 흐름. 이 CVE의 공개 PoC와 악용 보고는 확인 못 함.",
+      "patch": "공개된 수정 버전 정보 없음. Microsoft 취약 드라이버 차단 목록 반영 여부 확인 필요(확인 못 함). 학교 PC라면 RGB 유틸리티 자체를 설치 안 하는 게 가장 쉬운 완화야.",
+      "detection": "Sysmon 이벤트 ID 6에서 NTIOLib_X64.sys 로드, System 로그 7045의 커널 드라이버 서비스 생성, Microsoft-Windows-Threat-Intelligence ETW나 WDAC 감사 이벤트(CodeIntegrity 3076/3077)로 차단 목록 드라이버 로드 시도 확인.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "재구성, 실제 소스 아님 (추정)",
+          "lang": "C",
+          "code": "NTSTATUS DispatchIoctl(PDEVICE_OBJECT d, PIRP irp) {\n    /* 호출자 권한, 요청 범위 검증 없이 바로 하드웨어 접근 */\n    switch (stack->Parameters.DeviceIoControl.IoControlCode) {\n    case IOCTL_HW_ACCESS: return DoHwAccess(irp->AssociatedIrp.SystemBuffer);\n    }\n}"
+        },
+        {
+          "kind": "fix",
+          "label": "재구성, 실제 소스 아님 (수정 방향)",
+          "lang": "C",
+          "code": "/* 디바이스를 관리자 전용 SDDL로 만들고, 요청 주소, 포트를 허용 목록으로 제한 */\nif (!IsAllowedRange(req->Address, req->Length))\n    return STATUS_ACCESS_DENIED;"
+        }
+      ]
+    },
+    "deepDive": null
+  },
+  {
+    "cve": "CVE-2026-129433",
+    "date": "2026-11-15",
+    "grade": "orange",
+    "title": "Dokploy 백업 serviceName 셸 명령 주입으로 호스트 root",
+    "product": "Dokploy 0.31.1 미만 (셀프 호스팅 PaaS)",
+    "summary": "Compose 백업 예약 시 serviceName이 docker ps 필터 문자열에 따옴표만 둘러진 채 셸 명령으로 들어가. 조직 멤버 권한만 있으면 tRPC backup.create/update로 메타문자를 저장해 두고, 예약 백업이 root로 실행될 때 명령이 돌아. Docker 소켓이 마운트돼 있어서 호스트 장악으로 이어져.",
+    "cvss": 9.9,
+    "kev": false,
+    "poc": false,
+    "tags": [
+      "dokploy",
+      "command-injection",
+      "docker",
+      "self-hosted"
+    ],
+    "links": [
+      {
+        "label": "GitHub 권고 GHSA-j329-jw7j-rxjm",
+        "url": "https://github.com/Dokploy/dokploy/security/advisories/GHSA-j329-jw7j-rxjm"
+      },
+      {
+        "label": "Dokploy 커밋 b24006e",
+        "url": "https://github.com/Dokploy/dokploy/commit/b24006e16e95a10ce3daf739d06ac783e5c70ba0"
+      },
+      {
+        "label": "Dokploy v0.31.1 릴리스",
+        "url": "https://github.com/Dokploy/dokploy/releases/tag/v0.31.1"
+      },
+      {
+        "label": "VulnCheck 권고",
+        "url": "https://www.vulncheck.com/advisories/dokploy-before-0.31.1-os-command-injection-via-compose-backup-servicename"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-129433"
+      },
+      {
+        "label": "CVE.org",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-129433"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "packages/server/src/utils/backups/utils.ts의 getComposeContainerCommand()가 appName, serviceName을 템플릿 문자열로 docker ps --filter \"label=...=${serviceName}\" 안에 그대로 끼워 넣고, 이 문자열이 셸로 실행돼. 큰따옴표는 공백 분리만 막을 뿐 $(), 백틱, 따옴표 탈출을 막지 못해. serviceName은 백업 스케줄 객체에 저장되는 사용자 입력이라 저장 시점과 실행 시점이 분리된 2차(stored) 명령 주입이야. 같은 파일의 rclone rcat/deletefile 목적지 경로도 같은 방식으로 따옴표만 둘러져 있었어. CWE-78.",
+      "trigger": "원격, 인증 필요(조직 멤버). backup.create 또는 backup.update tRPC 프로시저로 serviceName을 저장할 수 있어야 하고, 실행은 예약 백업이 돌 때 서버 쪽에서 root로 일어나.",
+      "exploitation": "벤더 설명 기준으로 root 셸 명령 실행, 그리고 마운트된 /var/run/docker.sock으로 호스트 장악까지. 공개 PoC와 악용 보고는 확인 못 함.",
+      "patch": "0.31.1(커밋 b24006e, PR 5908). docker ps 필터 인자와 rclone 목적지를 shell-quote의 quote([...])로 감싸 단일 인자로 만들고, 로그에서 backupCommand 원문 출력을 뺐어. 클라우드 버전에선 웹서버 백업 접근을 아예 FORBIDDEN 처리. serviceName 자체의 형식 검증 추가는 이 diff에선 안 보여.",
+      "detection": "공개 IoC 없음. 백업 스케줄 테이블의 serviceName에 $, 백틱, ;, | 같은 문자가 있는지, 백업 실행 시점에 dokploy 컨테이너 아래로 sh, curl, docker run 같은 예상 밖 자식 프로세스가 생기는지 보면 돼.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "Dokploy 커밋 b24006e 수정 전 발췌",
+          "lang": "TypeScript",
+          "code": "// serviceName이 큰따옴표 안에 그대로 들어가고 셸로 실행됨\nreturn `docker ps -q --filter \"status=running\" --filter \"label=com.docker.compose.project=${appName}\" --filter \"label=com.docker.compose.service=${serviceName}\" | head -n 1`;"
+        },
+        {
+          "kind": "fix",
+          "label": "Dokploy 커밋 b24006e 발췌",
+          "lang": "TypeScript",
+          "code": "// shell-quote로 각 필터 값을 단일 인자로 이스케이프\nreturn `docker ps -q --filter \"status=running\" --filter ${quote([`label=com.docker.compose.project=${appName}`])} --filter ${quote([`label=com.docker.compose.service=${serviceName}`])} | head -n 1`;\n// rclone 목적지도 동일\nconst rcloneCommand = `rclone rcat ${rcloneFlags.join(\" \")} ${quote([rcloneDestination])}`;"
+        }
+      ]
+    },
+    "deepDive": null
+  },
+  {
+    "cve": "CVE-2026-129456",
+    "date": "2026-11-15",
+    "grade": "green",
+    "title": "FRRouting bgpd Tunnel Encap 길이 불일치 무시로 sub-TLV 참조 카운트 붕괴, UAF와 이중 해제",
+    "product": "FRRouting bgpd (커밋 1238ac4 이전)",
+    "summary": "BGP Tunnel Encapsulation 속성(type 23)의 바깥 TLV 길이가 속성 길이와 안 맞아도 로그만 남기고 계속 처리했어. 그 결과 intern된 sub-TLV 체인의 참조 카운트가 어긋나서, 경로가 아직 가리키는 체인이 먼저 해제되고 나중에 경로 정리 때 다시 해제돼. 세션이 맺어진 이웃만 가능하고 기본 재현은 bgpd 크래시야.",
+    "cvss": 7.7,
+    "kev": false,
+    "poc": false,
+    "tags": [
+      "frrouting",
+      "bgp",
+      "uaf",
+      "double-free",
+      "refcount"
+    ],
+    "links": [
+      {
+        "label": "FRRouting 이슈 20874",
+        "url": "https://github.com/FRRouting/frr/issues/20874"
+      },
+      {
+        "label": "FRRouting 커밋 1238ac4",
+        "url": "https://github.com/FRRouting/frr/pull/21176/changes/1238ac4a06e5c23595e8bf626856f297d0c302a2"
+      },
+      {
+        "label": "FRRouting 백포트 커밋 bebf95f",
+        "url": "https://github.com/FRRouting/frr/commit/bebf95f02bc0dccc6a1841f0c8cbcba1f617d655"
+      },
+      {
+        "label": "FRRouting 백포트 커밋 abef07b",
+        "url": "https://github.com/FRRouting/frr/commit/abef07b500e19baa924d157ab03809b93730e619"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-129456"
+      },
+      {
+        "label": "CVE.org",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-129456"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "bgpd/bgp_attr.c의 bgp_attr_encap()은 Tunnel Encap 속성을 파싱하면서 각 터널 TLV의 tlv_length와 남은 속성 길이 length를 비교하는데, 불일치 시 zlog_info()만 찍고 파싱을 이어갔어. 길이가 어긋난 채 만들어진 sub-TLV 체인이 intern(해시 공유 + refcount) 되면서 encap_unintern() 쪽과 증감 균형이 깨져. 그래서 Adj-RIB-In과 RIB 경로가 아직 참조하는 체인이 해제되고, 이후 경로 교체, 철회, 세션 종료 때 해제된 메모리의 refcount를 감소시키고 다시 free해. 파서 검증 실패를 경고로 처리한 게 refcount 불변식 붕괴로 번진 사례야. CWE-416, CWE-415.",
+      "trigger": "원격, BGP 세션이 맺어진 이웃(eBGP 포함)이 UPDATE에 type 23 속성을 실어야 해. RFC 9012는 eBGP에서 기본 필터링을 요구하지만 bgpd는 명시적 discard 설정이 없으면 모든 이웃에서 처리해. 리포터는 soft-reconfiguration inbound 설정 상태에서 재현했고 매번 터지진 않았다고 해.",
+      "exploitation": "리포터 빌드에선 메모리 계정 assertion으로 bgpd가 abort, 모든 BGP 세션이 끊기고 재시작마다 반복 가능(DoS). 해제된 힙에 쓰기와 이중 해제가 있으니 크래시 이상의 영향은 배제할 수 없다는 게 CNA 설명이고, 코드 실행 사례는 공개된 게 없어.",
+      "patch": "커밋 1238ac4(2026-02-26 작성, 백포트 bebf95f, abef07b): 불일치 시 flog_err(EC_BGP_ATTR_LEN)로 기록하고 bgp_attr_malformed(args, BGP_NOTIFY_UPDATE_OPT_ATTR_ERR, args->total)을 반환해 속성을 거부해. 임시 완화는 eBGP 이웃에서 type 23 속성 discard 설정.",
+      "detection": "bgpd 로그의 'tlv_length(...) != length(...)'(수정 전) 또는 'Tunnel Encap attribute length ... does not match'(수정 후), bgpd abort와 반복 세션 리셋, 이웃 UPDATE에 type 23 속성 존재 여부.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "FRRouting 커밋 1238ac4 수정 전 발췌",
+          "lang": "C",
+          "code": "length -= 4;\nif (tlv_length != length) {\n    /* 불일치를 로그만 남기고 계속 파싱 */\n    zlog_info(\"%s: tlv_length(%d) != length(%d)\",\n              __func__, tlv_length, length);\n}"
+        },
+        {
+          "kind": "fix",
+          "label": "FRRouting 커밋 1238ac4 발췌",
+          "lang": "C",
+          "code": "if (tlv_length != length) {\n    flog_err(EC_BGP_ATTR_LEN,\n        \"Tunnel Encap attribute length %d does not match remaining attribute length %d\",\n        tlv_length, length);\n    /* 속성을 malformed로 처리해 intern 전에 거부 */\n    return bgp_attr_malformed(args, BGP_NOTIFY_UPDATE_OPT_ATTR_ERR, args->total);\n}"
+        }
+      ]
+    },
+    "deepDive": null
+  },
+  {
     "cve": "CVE-2026-13684",
     "date": "2026-11-05",
     "grade": "red",

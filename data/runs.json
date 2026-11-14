@@ -70,5 +70,11 @@
     "note": "CISA KEV 신규 2건(11/13): UnrealIRCd labeled-response label 태그 구분자 주입으로 서버 권한 S2S 명령, Check Point Gaia DynamicCLI 월드 쓰기 소켓 root LPE. NetScaler ADC, Gateway 메모리 오버플로 28건 레코드 발행, Tactical RMM 보고서 file:// 읽기에서 SECRET_KEY 재사용으로 전 에이전트 명령. N-central Hotfix 2 우회 체인 악용 보도(변화).",
     "count": 4,
     "deepDive": null
+  },
+  {
+    "date": "2026-11-15",
+    "note": "CISA KEV 신규 없음(11/13 등재 2건은 전날 기록). Dokploy 백업 serviceName 셸 주입으로 호스트 root(0.31.1 수정), FRRouting bgpd Tunnel Encap 길이 불일치 무시로 refcount 붕괴 UAF, RGB 유틸리티 번들 드라이버 2건(CoolerMaster WinRing0x64.sys, Kingston NTIOLib_X64.sys). CVE 미할당 Windows CLFS SignDrop 공개 익스플로잇은 기록 보류.",
+    "count": 4,
+    "deepDive": null
   }
 ]
