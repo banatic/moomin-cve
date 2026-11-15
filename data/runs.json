@@ -76,5 +76,11 @@
     "note": "CISA KEV 신규 없음(11/13 등재 2건은 전날 기록). Dokploy 백업 serviceName 셸 주입으로 호스트 root(0.31.1 수정), FRRouting bgpd Tunnel Encap 길이 불일치 무시로 refcount 붕괴 UAF, RGB 유틸리티 번들 드라이버 2건(CoolerMaster WinRing0x64.sys, Kingston NTIOLib_X64.sys). CVE 미할당 Windows CLFS SignDrop 공개 익스플로잇은 기록 보류.",
     "count": 4,
     "deepDive": null
+  },
+  {
+    "date": "2026-11-16",
+    "note": "CISA KEV 신규 없음(최종 갱신 11/13). 주말이라 조용함. Cyrus SASL SRP 서버 A mod N 검사 누락으로 무인증 로그인(업스트림은 SRP 플러그인 삭제), Apache Shiro LDAP 인증 캐시와 AllowAllCredentialsMatcher 조합으로 아무 비밀번호 통과, OkHttp 핀 매칭이 끝 점 호스트명을 정규화 안 함. 심층: WinRing0x64.sys 디바이스 ACL과 IOCTL 구조.",
+    "count": 3,
+    "deepDive": "CVE-2026-129255"
   }
 ]
