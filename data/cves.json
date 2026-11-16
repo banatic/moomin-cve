@@ -820,6 +820,71 @@
     "deepDive": null
   },
   {
+    "cve": "CVE-2026-111760",
+    "date": "2026-11-17",
+    "grade": "orange",
+    "title": "Git 캐시 엔트리 이름 길이 32비트 절단으로 서브모듈 gitfile을 심볼릭 링크로 덮어씀",
+    "product": "Git 2.50.2, 2.51.3, 2.52.1, 2.53.1, 2.54.1, 2.55.1, 2.56.1 미만",
+    "summary": "체크아웃 중 경로 길이는 size_t로 계산하는데 cache_entry의 ce_namelen은 32비트라서, 4GiB를 넘는 경로는 길이가 잘려 저장돼. 경로 안전성 검사는 NUL까지 전체 문자열을 보고 통과시키지만 디스크에 쓸 때는 잘린 길이만 써서 '.git'으로 쓰이고, 새로 받은 서브모듈의 .git gitfile이 심볼릭 링크로 덮여 공격자 훅이나 설정이 실행될 수 있어. 공격자가 직접 호스팅한 저장소를 git clone --recurse-submodules로 받을 때만 해당돼.",
+    "cvss": 8.0,
+    "kev": false,
+    "poc": false,
+    "tags": [
+      "git",
+      "integer-truncation",
+      "symlink",
+      "submodule",
+      "supply-chain",
+      "cwe-59",
+      "cwe-197"
+    ],
+    "links": [
+      {
+        "label": "git 보안 권고 GHSA-vp2w-7xxj-jvxr",
+        "url": "https://github.com/git/git/security/advisories/GHSA-vp2w-7xxj-jvxr"
+      },
+      {
+        "label": "git 커밋 29411cf",
+        "url": "https://github.com/git/git/commit/29411cf59fd417d8fce1be40ab2911e3e0885f26"
+      },
+      {
+        "label": "Git 2.56.1 릴리스 노트",
+        "url": "https://gitlab.com/git-scm/git/-/blob/v2.56.1/Documentation/RelNotes/2.56.1.adoc"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-111760"
+      },
+      {
+        "label": "CVE.org",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-111760"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "Git은 캐시 엔트리 길이를 size_t와 unsigned int로 섞어 다뤄. unpack-trees.c의 create_ce_entry()가 트리를 평탄화하면서 traverse_path_len()으로 64비트 길이를 계산하고, make_empty_cache_entry()로 그 크기만큼 할당한 뒤 ce->ce_namelen(32비트)에 대입하는데 여기서 상위 비트가 잘려. 그래서 ce->name에는 전체 경로가 들어 있고 verify_path_internal()은 NUL까지 전체 문자열을 검사해 문제를 못 찾지만, checkout_entry_ca()는 strbuf_add(&path, ce->name, ce_namelen(ce))로 잘린 길이만큼만 경로를 만들어 다른 파일(.git)에 쓰게 돼. 검사한 문자열과 실제로 쓰는 문자열이 다른, 길이 절단에서 나온 TOCTOU성 불일치야. CWE-59(링크 해석)로 분류됐지만 뿌리는 정수 절단(CWE-197).",
+      "trigger": "원격, 사용자 상호작용 필요. 피해자가 공격자가 직접 호스팅한(일반 포지가 아닌) 저장소를 --recurse-submodules로 클론해야 해. 일반 클론에서는 .git 디렉터리를 심볼릭 링크로 바꾸는 걸 거부하지만, 갓 클론된 서브모듈의 .git은 디렉터리가 아니라 gitfile이라 이 방어를 안 거쳐. CVSS AC:H, 8.0.",
+      "exploitation": "검증을 통과한 엔트리가 디스크에서는 서브모듈의 .git 위치에 심볼릭 링크로 써지고, 링크 대상이 공격자가 넣어둔 훅이나 config가 있는 디렉터리면 이후 Git 동작에서 그 훅이나 설정이 실행돼(코드 실행). 공개 PoC와 악용 보고는 확인 못 함.",
+      "patch": "커밋 29411cf(Elijah Newren, Toon Claes)에서 모든 캐시 엔트리 할당 경로(mem_pool__ce_alloc, mem_pool__ce_calloc, make_empty_transient_cache_entry)에 verify_ce_namelen()을 넣어 INT_MAX를 넘는 길이를 할당 전에 die()로 거부해. make_cache_entry 등의 길이 변수도 int에서 size_t로 넓혀 검사 전 축소를 막았고, verify_path_internal()에 index.maxPathLen(기본 INT_MAX/2-1024) 상한을 추가했어. 2.50.2부터 2.56.1까지 7개 브랜치에 백포트. 임시 완화는 신뢰할 수 없는 저장소에 --recurse-submodules 쓰지 않기.",
+      "detection": "공개된 전용 지표 없음. 정황상 체크아웃 중 비정상적으로 큰 메모리 할당(수 GiB)과 서브모듈 .git이 gitfile 대신 심볼릭 링크로 존재하는 상태가 흔적이 될 수 있어(추정). find로 .git이 링크인 서브모듈을 찾아보는 정도.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "git/git 커밋 29411cf 커밋 메시지 발췌 (수정 전 흐름)",
+          "lang": "C",
+          "code": "size_t len = traverse_path_len(...);        /* 64비트 길이 */\nce = make_empty_cache_entry(istate, len);   /* 전체 길이로 할당 */\nce->ce_namelen = len;                       /* 32비트 필드로 절단 */\nmake_traverse_path(ce->name, len + 1, ...); /* 이름은 전체 길이로 기록 */\n/* 검사: verify_path_internal(ce->name) 는 전체 문자열 */\n/* 쓰기: strbuf_add(&path, ce->name, ce_namelen(ce)) 는 잘린 길이 */"
+        },
+        {
+          "kind": "fix",
+          "label": "git/git 커밋 29411cf read-cache.c 발췌",
+          "lang": "C",
+          "code": "static inline void verify_ce_namelen(size_t len)\n{\n\tif (len > INT_MAX)   /* 할당 전에 32비트 범위 초과 거부 */\n\t\tdie(_(\"index entry path is too long (%\"PRIuMAX\" bytes)\"),\n\t\t    (uintmax_t)len);\n}\n/* mem_pool__ce_alloc 등 모든 할당 경로에서 호출 */\n-\tint len;\n+\tsize_t len;   /* 검사 전 축소 방지 */"
+        }
+      ]
+    },
+    "deepDive": null
+  },
+  {
     "cve": "CVE-2026-111793",
     "date": "2026-11-11",
     "grade": "red",
@@ -2331,6 +2396,72 @@
     "deepDive": null
   },
   {
+    "cve": "CVE-2026-124019",
+    "date": "2026-11-17",
+    "grade": "green",
+    "title": "VB-CABLE 가상 오디오 커널 드라이버, KS 속성 핸들러의 전체 채널 값을 인덱스로 써서 커널 OOB 쓰기",
+    "product": "VB-Audio VB-CABLE (vbaudio_cable64_win10.sys 10.0.10011.16384 이하)",
+    "summary": "VB-CABLE 커널 스트리밍 드라이버의 KSPROPSETID_Audio MUTE, VOLUMELEVEL, PEAKMETER2 속성 핸들러가 '전체 채널'을 뜻하는 센티널 값을 경계 검사 없이 루프 종료 조건이나 배열 인덱스로 써. 저무결성에서도 열리는 KS 필터 디바이스라 표준 사용자가 커널 메모리에 순차 쓰기, 범위 밖 읽기를 할 수 있어 LPE나 BSOD로 이어져. 방송, 수업 녹화용으로 흔히 깔리는 서명 드라이버라 BYOVD 후보로도 볼 만해.",
+    "cvss": 7.8,
+    "kev": false,
+    "poc": false,
+    "tags": [
+      "windows",
+      "kernel",
+      "driver",
+      "kernel-streaming",
+      "byovd",
+      "oob-write",
+      "cwe-787",
+      "cwe-125"
+    ],
+    "links": [
+      {
+        "label": "VulnCheck 권고",
+        "url": "https://www.vulncheck.com/advisories/vb-audio-vb-cable-kernel-driver-out-of-bounds-write"
+      },
+      {
+        "label": "VB-Audio VB-CABLE 제품 페이지",
+        "url": "https://vb-audio.com/Cable/index.htm"
+      },
+      {
+        "label": "VulDB",
+        "url": "https://vuldb.com/vuln/437843"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-124019"
+      },
+      {
+        "label": "CVE.org",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-124019"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "Windows 커널 스트리밍(KS)에서 오디오 노드 속성 요청은 KSNODEPROPERTY_AUDIO_CHANNEL 구조체에 채널 번호를 담아 오고, 규약상 Channel이 0xFFFFFFFF(전체 채널)인 요청이 있어. VB-CABLE의 MUTE, VOLUMELEVEL, PEAKMETER2 핸들러는 이 센티널을 별도 분기로 처리하지 않고 채널별 배열의 인덱스나 루프 상한으로 그대로 써서 배열 경계를 넘어 읽고 써(VulnCheck 설명 기준). '센티널 값과 유효 인덱스를 같은 정수 공간에 섞은' 경계 검사 누락, CWE-787과 CWE-125. 구조체와 상수 이름은 KS 공개 규약에서 가져온 것이고 드라이버 내부 함수명은 공개되지 않았어.",
+      "trigger": "로컬, 표준 사용자(PR:L). 드라이버가 설치돼 있어야 하고, KS 필터 디바이스 객체가 저무결성 수준에서도 열린다고 권고에 적혀 있어 브라우저 샌드박스 수준 프로세스에서도 접근 가능성이 있어(추정, 실제 샌드박스 정책은 확인 안 함).",
+      "exploitation": "쓰기 쪽은 공격자가 고른 값을 커널 메모리에 순차적으로 써서 전역 변수와 객체 포인터를 덮는 형태라 권한 상승 프리미티브가 되고, 읽기 쪽은 배열 너머 커널 메모리를 흘려 KASLR 우회 재료가 될 수 있어(개념 수준). 공개 PoC와 악용 보고는 확인 못 함. 서명된 서드파티 드라이버라 공격자가 직접 설치해 쓰는 BYOVD 시나리오도 이론상 가능.",
+      "patch": "수정 버전 정보는 확인 못 함. CVE 레코드는 10.0.10011.16384 이하를 영향 범위로만 적었어. 수정 방향은 Channel == 0xFFFFFFFF를 별도로 처리하고 그 외 값은 노드 채널 수와 비교해 거부하는 것(추정). 임시 완화는 쓰지 않는 PC에서 제거, 또는 WDAC 드라이버 차단 정책에 해당 해시 추가.",
+      "detection": "드라이버 로드는 Sysmon 이벤트 6(ImageLoad, Driver), 시스템 로그 서비스 설치 이벤트 7045에서 vbaudio_cable64_win10.sys 확인. 관리 대상 PC의 드라이버 인벤토리에서 버전 10.0.10011.16384 이하 찾기. IOCTL_KS_PROPERTY 호출 자체를 일반 로그로 보기는 어렵고 공개된 전용 지표도 없어. BSOD 덤프에서 이 드라이버가 걸린 크래시가 반복되면 의심 신호.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "재구성, 실제 소스 아님 (권고 설명 기반 추정)",
+          "lang": "C",
+          "code": "NTSTATUS PropVolume(PPCPROPERTY_REQUEST r) {\n    PKSNODEPROPERTY_AUDIO_CHANNEL p = r->Instance;\n    ULONG ch = p->Channel;          // 0xFFFFFFFF = 전체 채널 센티널\n    g_Volume[ch] = *(LONG*)r->Value; // 경계 검사 없이 인덱스로 사용\n    return STATUS_SUCCESS;\n}"
+        },
+        {
+          "kind": "fix",
+          "label": "재구성, 실제 소스 아님 (수정 방향 추정)",
+          "lang": "C",
+          "code": "ULONG ch = p->Channel;\nif (ch == KSAUDIO_CHANNEL_ALL) {          // 센티널은 별도 분기\n    for (ULONG i = 0; i < NUM_CHANNELS; i++) g_Volume[i] = v;\n} else if (ch < NUM_CHANNELS) {\n    g_Volume[ch] = v;\n} else return STATUS_INVALID_PARAMETER;   // 범위 밖 거부"
+        }
+      ]
+    },
+    "deepDive": null
+  },
+  {
     "cve": "CVE-2026-124194",
     "date": "2026-11-11",
     "grade": "red",
@@ -2951,6 +3082,53 @@
           "code": "long id;\nif (!parse_long(http_param(\"id\"), &id)) return 400; // 숫자만\nstmt_bind_int64(st, 1, id);"
         }
       ]
+    },
+    "deepDive": null
+  },
+  {
+    "cve": "CVE-2026-126526",
+    "date": "2026-11-17",
+    "grade": "orange",
+    "title": "OneNote 힙 버퍼 오버플로 원격 코드 실행, 11월 Patch Tuesday 뒤 늦게 공개",
+    "product": "Microsoft 365 Apps for Enterprise, Office LTSC 2021, 2024 (Windows, Mac)",
+    "summary": "OneNote에서 힙 기반 버퍼 오버플로가 있어 조작된 파일을 열면 코드가 실행될 수 있어. 11월 16일(미국 시간) MSRC에 공개됐고 수정 빌드는 LTSC 2021 16.0.14334.21048, LTSC 2024 16.0.17932.21140, Mac 16.115.26110837. 악용 보고는 없고(E:U) 기술 세부도 공개되지 않았어.",
+    "cvss": 8.8,
+    "kev": false,
+    "poc": false,
+    "tags": [
+      "microsoft",
+      "office",
+      "onenote",
+      "heap-overflow",
+      "cwe-122",
+      "school"
+    ],
+    "links": [
+      {
+        "label": "MSRC 권고",
+        "url": "https://msrc.microsoft.com/update-guide/vulnerability/CVE-2026-126526"
+      },
+      {
+        "label": "Office 보안 업데이트 빌드 목록",
+        "url": "https://aka.ms/OfficeSecurityReleases"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-126526"
+      },
+      {
+        "label": "CVE.org",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-126526"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "공개된 세부 없음. MSRC는 OneNote의 힙 기반 버퍼 오버플로(CWE-122)라고만 밝혔고 어느 파서나 레코드 형식인지는 공개하지 않았어. OneNote 파일(.one)은 리비전 저장소 형식(MS-ONESTORE)의 복잡한 바이너리 구조라 파서 결함이 반복되는 영역이야(배경 설명, 이 CVE의 위치는 확인 못 함).",
+      "trigger": "원격, 사용자 상호작용 필요(UI:R). 사용자가 조작된 OneNote 콘텐츠를 열어야 해. 인증 불필요. MSRC 벡터 AV:N/AC:L/PR:N/UI:R.",
+      "exploitation": "힙 오버플로로 OneNote 프로세스 권한의 코드 실행까지 이어질 수 있다고 MS가 평가. 악용 없음(E:U), 공개 PoC 없음. CISA SSVC도 Exploitation none.",
+      "patch": "Microsoft 365 Apps는 최신 채널 빌드, LTSC 2021은 16.0.14334.21048, LTSC 2024는 16.0.17932.21140, Mac은 16.115.26110837 이상. 무엇이 바뀌었는지는 공개 안 됨. 레코드 예약은 11/10, 공개는 11/16이라 정기 패치 후 추가 공개된 건으로 보여(추정).",
+      "detection": "공개된 전용 지표 없음. 일반적으로 ONENOTE.EXE가 cmd.exe, powershell.exe, mshta.exe 같은 자식 프로세스를 띄우는지 Sysmon 이벤트 1이나 EDR 프로세스 트리로 보는 게 기본. 메일 게이트웨이에서 .one 첨부를 차단 또는 격리하는 것도 오래된 OneNote 피싱 대응과 같아.",
+      "code": []
     },
     "deepDive": null
   },
@@ -3602,6 +3780,74 @@
     "deepDive": null
   },
   {
+    "cve": "CVE-2026-129956",
+    "date": "2026-11-17",
+    "grade": "green",
+    "title": "Sandboxie SbieSvc 업데이터 요청을 서명 프로세스 주입으로 통과, SYSTEM UpdUtil로 임의 파일 쓰기",
+    "product": "Sandboxie-Plus 1.18.6 미만",
+    "summary": "SbieSvc의 MSGID_PROCESS_RUN_UPDATER 핸들러는 호출자가 서명된 실행 파일인지만 보고 elevate=2면 UpdUtil.exe를 SYSTEM 토큰으로 띄워. 표준 사용자가 서명된 SandMan.exe에 코드를 주입하면 이 검사를 통과하고, SYSTEM으로 돈 UpdUtil이 호출자가 고른 내용을 호출자가 고른 경로에 쓰거나 호출자 지정 디렉터리의 KmdUtil.exe를 실행해. 1.18.6에서 UpdUtil 쪽을 막았어.",
+    "cvss": 7.8,
+    "kev": false,
+    "poc": false,
+    "tags": [
+      "windows",
+      "lpe",
+      "sandboxie",
+      "service-ipc",
+      "code-signing-trust",
+      "cwe-269"
+    ],
+    "links": [
+      {
+        "label": "Sandboxie 보안 권고 GHSA-46vh-v2q6-wrcv",
+        "url": "https://github.com/sandboxie-plus/Sandboxie/security/advisories/GHSA-46vh-v2q6-wrcv"
+      },
+      {
+        "label": "Sandboxie 커밋 4e121cc (1.18.6)",
+        "url": "https://github.com/sandboxie-plus/Sandboxie/commit/4e121cc4dacdc31973adcb81581b0414d48c26fc"
+      },
+      {
+        "label": "v1.18.5 ProcessServer.cpp RunUpdaterHandler",
+        "url": "https://github.com/sandboxie-plus/Sandboxie/blob/v1.18.5/Sandboxie/core/svc/ProcessServer.cpp#L1519-L1611"
+      },
+      {
+        "label": "VulnCheck 권고",
+        "url": "https://www.vulncheck.com/advisories/sandboxie-plus-before-1.18.6-privilege-escalation-via-sbiesvc-msgid-process-run-updater"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-129956"
+      },
+      {
+        "label": "CVE.org",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-129956"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "ProcessServer::RunUpdaterHandler는 호출자가 샌드박스 밖인지(SbieApi_QueryProcessInfo)와 PipeServer::IsCallerSigned()만 확인해. IsCallerSigned는 호출 프로세스의 이미지 파일 경로를 얻어 그 파일의 서명을 검증하는데, 이건 '디스크의 파일이 서명됐다'는 뜻이지 '지금 그 프로세스에서 도는 코드가 서명됐다'는 뜻이 아니야. 같은 사용자 권한이면 서명된 SandMan.exe에 코드를 주입할 수 있으니 신뢰 경계가 사실상 '아무 표준 사용자'로 무너져. 그 뒤 req->elevate == 2면 서비스 자신의 SYSTEM 토큰을 복제해 세션 ID만 바꾸고 UpdUtil.exe를 호출자가 준 인자로 실행해. UpdUtil은 download, run_setup 같은 동작으로 호출자 지정 내용을 호출자 지정 경로에 쓰고, restart 플래그에서는 호출자가 준 base_dir의 KmdUtil.exe를 실행했어. 부적절한 권한 관리(CWE-269), 프로세스 이미지 서명을 인가 근거로 쓴 설계 결함.",
+      "trigger": "로컬, 표준 사용자. Sandboxie-Plus가 설치돼 SbieSvc가 돌고 있어야 하고, 서명된 SandMan.exe 프로세스에 코드를 넣을 수 있어야 해(같은 사용자 소유 프로세스라 보통 가능). 사용자 상호작용 불필요.",
+      "exploitation": "서명 프로세스를 거쳐 업데이터 요청을 보내면 SYSTEM UpdUtil이 임의 경로 파일 쓰기 프리미티브가 되고, 이걸 SYSTEM 코드 실행으로 바꿀 수 있어(서비스 바이너리나 로드되는 DLL 위치 등, 개념 수준). 공개 PoC는 확인 못 함(trickest 목록 없음), 악용 보고 없음.",
+      "patch": "1.18.6(커밋 4e121cc)의 UpdUtil.cpp 변경: IsProcessLocalSystem()으로 SYSTEM 실행 여부를 판정하고 SYSTEM이면 update, upgrade, install, modify(서명 검증을 거치는 동작)만 허용, 나머지는 거부. restart, open 경로의 KmdUtil.exe, start.exe를 호출자 base_dir 대신 설치 디렉터리(wPath)에서 실행. ReadRegistryStringValue가 HKCU 키를 받지 않게 해 표준 사용자가 쓸 수 있는 UninstallString을 SYSTEM으로 실행하는 경로도 막았어. PipeServer::IsCallerSigned는 GetModuleFileNameEx를 QueryFullProcessImageNameW로 바꿨을 뿐 '이미지 서명 = 신뢰' 모델 자체는 그대로라서, 서비스 측 인가는 여전히 주입 가능한 프로세스를 믿어. 위험한 동작을 SYSTEM UpdUtil에서 빼는 방식의 완화야.",
+      "detection": "UpdUtil.exe가 SYSTEM(부모 SbieSvc.exe)으로 뜨면서 update, upgrade, install, modify 외의 첫 인자를 가진 경우. 표준 사용자 소유 프로세스가 SandMan.exe에 원격 스레드나 메모리 쓰기를 하는 것(Sysmon 이벤트 8 CreateRemoteThread, 10 ProcessAccess, Microsoft-Windows-Threat-Intelligence ETW의 원격 쓰기 이벤트). SYSTEM UpdUtil이 설치 디렉터리 밖의 KmdUtil.exe를 실행하는 프로세스 생성(Sysmon 이벤트 1).",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "sandboxie-plus/Sandboxie v1.18.5 ProcessServer.cpp RunUpdaterHandler 발췌",
+          "lang": "C++",
+          "code": "#ifndef WITH_DEBUG\n    if (!PipeServer::IsCallerSigned())   // 이미지 파일 서명만 확인, 주입된 코드는 못 걸러\n        return SHORT_REPLY(STATUS_INVALID_SIGNATURE);\n#endif\n    ...\n    if (req->elevate == 2) {\n        // run as system, works also for non administrative users\n        OpenProcessToken(GetCurrentProcess(), TOKEN_RIGHTS, &PrimaryTokenHandle);"
+        },
+        {
+          "kind": "fix",
+          "label": "sandboxie-plus/Sandboxie 커밋 4e121cc UpdUtil.cpp diff 발췌",
+          "lang": "C++",
+          "code": "+bool IsActionAllowedAsSystem(const std::wstring& action)\n+{   // 서명 검증을 거치는 동작만 SYSTEM 허용\n+\treturn action == L\"update\" || action == L\"upgrade\"\n+\t\t|| action == L\"install\" || action == L\"modify\";\n+}\n+\tif (!arguments.empty() && IsProcessLocalSystem() && !IsActionAllowedAsSystem(arguments[0]))\n+\t\treturn ERROR_INVALID;\n-\t\t\tExecute(base_dir + L\"\\\\KmdUtil.exe\", L\"stop SbieSvc\");  // 호출자 경로\n+\t\t\tExecute(wPath + L\"\\\\KmdUtil.exe\", L\"stop SbieSvc\");     // 설치 경로"
+        }
+      ]
+    },
+    "deepDive": null
+  },
+  {
     "cve": "CVE-2026-13684",
     "date": "2026-11-05",
     "grade": "red",
@@ -4057,6 +4303,75 @@
       "exploitation": "이론상 가능. 악용 없음, 공개 PoC 없음, CISA SSVC도 Exploitation none, Automatable no, MSRC 평가 악용 가능성 낮음.",
       "patch": "Microsoft Store로 2026-10-13 배포. CVE 레코드는 11.2605.91.0 미만이 영향이라 하고 11-02 MSRC 문서는 11.2609.401.0을 고정 버전으로 적었는데 이유 설명이 없다. Windows 누적 업데이트로는 안 고쳐지고, 11월 5일 기준 Store가 11.2603.251.0, 11.2605.81.0을 주는 사례가 보고됐다.",
       "detection": "PowerShell Get-AppxPackage -Name Microsoft.Paint로 버전을 확인한다. 11.2605.91.0 미만이면 어느 기준으로도 취약하고 목표는 11.2609.401.0 이상. 탐지 시그니처는 공개된 것 없음."
+    },
+    "deepDive": null
+  },
+  {
+    "cve": "CVE-2026-84443",
+    "date": "2026-11-17",
+    "grade": "orange",
+    "title": "LibreOffice 26.2.7, 26.8.2 묶음 수정, 매크로 보안 설정을 우회하는 문서 코드 실행 다수",
+    "product": "LibreOffice 26.2.7 미만, 26.8.2 미만",
+    "summary": "LibreOffice가 CVE 25건을 한 번에 공개했고 그중 CVSS 4.0 8.5짜리 7건이 '문서를 열거나 조작하면 매크로 보안 설정과 무관하게 코드 실행' 유형이야. 대표 건인 CVE-2026-84443은 Base 문서 이벤트에 묶인 매크로가 매크로 보안 검사 없이 실행되던 문제. 26.2.7, 26.8.2로 올리면 돼.",
+    "cvss": 8.5,
+    "kev": false,
+    "poc": false,
+    "tags": [
+      "libreoffice",
+      "office",
+      "macro-security-bypass",
+      "document",
+      "cwe-693",
+      "cwe-470",
+      "school"
+    ],
+    "links": [
+      {
+        "label": "LibreOffice 권고 CVE-2026-84443",
+        "url": "https://www.libreoffice.org/about-us/security/advisories/cve-2026-84443"
+      },
+      {
+        "label": "LibreOffice 권고 CVE-2026-101892",
+        "url": "https://www.libreoffice.org/about-us/security/advisories/cve-2026-101892"
+      },
+      {
+        "label": "LibreOffice 권고 CVE-2026-104692",
+        "url": "https://www.libreoffice.org/about-us/security/advisories/cve-2026-104692"
+      },
+      {
+        "label": "LibreOffice 권고 CVE-2026-101352",
+        "url": "https://www.libreoffice.org/about-us/security/advisories/cve-2026-101352"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-84443"
+      },
+      {
+        "label": "CVE.org",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-84443"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "공통 패턴은 '문서에 들어 있는 실행 가능한 연결고리가 매크로 보안 게이트를 거치지 않는' 정책 적용 누락(CWE-693)이야. CVE-2026-84443: Base 문서의 이벤트(열기, 닫기)에 묶인 매크로가 매크로 보안 설정 적용 없이 실행됨. CVE-2026-101352: 문서 자체 UI 커스터마이징(단축키, 메뉴, 툴바)에 묶인 매크로, 스크립트 명령이 보안 설정을 안 거침. CVE-2026-101892: ODF 폼 컨트롤이 지정한 컴포넌트 이름이 실제 폼 컨트롤이 아니어도 생성되고 저장된 속성이 적용돼 LibreOffice 설정을 바꿀 수 있음(CWE-470, 외부 입력으로 클래스 선택). CVE-2026-104692: 번들 HSQLDB를 일반 JDBC 드라이버로 쓰면 SQL에서 호출 가능한 Java 클래스 제한이 빠져 임의 Java 메서드 호출. 그 밖에 CVE-2026-101930(HTML 문서 이벤트 매크로), CVE-2026-104007, CVE-2026-104920(JDBC 드라이버 로드 경로), CVE-2026-100101(유닉스 계열 메일 보내기 명령) 등.",
+      "trigger": "로컬, 사용자 상호작용 필요(UI:P). 사용자가 조작된 문서를 열어야 하고, 일부는 단축키 누르기나 메뉴 선택 같은 추가 동작이 필요해. 84443은 문서 열기뿐 아니라 변환(헤드리스 변환 서버 포함)에서도 발동한다고 권고에 적혀 있어.",
+      "exploitation": "매크로나 Java 메서드 호출을 통해 LibreOffice 사용자 권한으로 임의 명령 실행. 공개 PoC와 악용 보고는 확인 못 함.",
+      "patch": "26.2.7과 26.8.2에서 수정. 84443은 Base 문서 이벤트 매크로도 다른 문서와 똑같이 매크로 보안 설정을 따르게 했고, 101352는 문서 UI 커스터마이징의 매크로, 스크립트 명령을 문서 매크로가 허용될 때만 유지, 101892는 폼 컨트롤이 아닌 컴포넌트를 무시, 104692는 접근 경로와 무관하게 HSQLDB 내장 함수만 호출 가능하게 했어. 소스 diff는 확인 안 함.",
+      "detection": "soffice.bin(또는 soffice.exe)이 셸, 스크립트 인터프리터, java.exe를 자식으로 띄우는지 프로세스 트리로 보기(Sysmon 이벤트 1). 문서 변환 서버를 돌린다면 변환 프로세스의 자식 프로세스 생성 감시가 특히 중요해. 전용 지표는 공개되지 않았어.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "재구성, 실제 소스 아님 (권고 설명 기반 신뢰 경계 모식)",
+          "lang": "C++",
+          "code": "void onDocumentEvent(Doc& d, Event e) {\n    Macro* m = d.boundMacro(e);   // 문서가 지정한 매크로\n    // Base 문서 경로에서 보안 게이트 호출 누락\n    m->run();\n}"
+        },
+        {
+          "kind": "fix",
+          "label": "재구성, 실제 소스 아님 (수정 방향)",
+          "lang": "C++",
+          "code": "void onDocumentEvent(Doc& d, Event e) {\n    Macro* m = d.boundMacro(e);\n    if (!d.macroSecurity().allowsDocumentMacros())  // 다른 문서와 같은 게이트\n        return;\n    m->run();\n}"
+        }
+      ]
     },
     "deepDive": null
   },

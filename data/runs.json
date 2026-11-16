@@ -82,5 +82,11 @@
     "note": "CISA KEV 신규 없음(최종 갱신 11/13). 주말이라 조용함. Cyrus SASL SRP 서버 A mod N 검사 누락으로 무인증 로그인(업스트림은 SRP 플러그인 삭제), Apache Shiro LDAP 인증 캐시와 AllowAllCredentialsMatcher 조합으로 아무 비밀번호 통과, OkHttp 핀 매칭이 끝 점 호스트명을 정규화 안 함. 심층: WinRing0x64.sys 디바이스 ACL과 IOCTL 구조.",
     "count": 3,
     "deepDive": "CVE-2026-129255"
+  },
+  {
+    "date": "2026-11-17",
+    "note": "CISA KEV 신규 없음(최종 갱신 11/13). Git 캐시 엔트리 이름 길이 32비트 절단으로 서브모듈 gitfile 심볼릭 링크 덮어쓰기(2.56.1 등 수정), OneNote 힙 오버플로 RCE 추가 공개, LibreOffice 26.2.7, 26.8.2 묶음 수정(매크로 보안 우회 다수), Sandboxie SbieSvc 업데이터 SYSTEM 경로 LPE, VB-CABLE 커널 드라이버 KS 속성 OOB 쓰기.",
+    "count": 5,
+    "deepDive": null
   }
 ]
