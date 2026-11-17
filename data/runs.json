@@ -88,5 +88,11 @@
     "note": "CISA KEV 신규 없음(최종 갱신 11/13). Git 캐시 엔트리 이름 길이 32비트 절단으로 서브모듈 gitfile 심볼릭 링크 덮어쓰기(2.56.1 등 수정), OneNote 힙 오버플로 RCE 추가 공개, LibreOffice 26.2.7, 26.8.2 묶음 수정(매크로 보안 우회 다수), Sandboxie SbieSvc 업데이터 SYSTEM 경로 LPE, VB-CABLE 커널 드라이버 KS 속성 OOB 쓰기.",
     "count": 5,
     "deepDive": null
+  },
+  {
+    "date": "2026-11-18",
+    "note": "CISA KEV 신규 없음(최종 갱신 11/13). Oracle 첫 11월 월간 CSPU: OpenJDK AVX-512 Base64 스텁 꼬리 경계 누락 힙 오버플로(Java4Shell, 17.0.21.1 등 수정), WebLogic TopLink 무인증 10.0. Dell SupportAssist OS Recovery 서명 검증 우회 등 5건, Firefox 160.0.1 미디어 UAF, glibc CP949 iconv 과다 읽기. 변화: N-central Hotfix 3과 마이너 공격 보고.",
+    "count": 5,
+    "deepDive": null
   }
 ]

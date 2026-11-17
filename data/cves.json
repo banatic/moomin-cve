@@ -606,7 +606,7 @@
     "title": "Payara 관리 REST 인증 우회, 헤더 존재만으로 원격 거부 검사 생략",
     "product": "Azul Payara Server 7.6.0, 6.44.0, 5.93.0 미만 등 (Community 7.2026.11 미만 포함)",
     "summary": "X-GlassFish-authToken 헤더가 '있기만 하면' 원격 접근 거부 검사를 건너뛰고, 토큰이 틀리면 비밀번호 인증으로 넘어가는데 기본 도메인은 관리자 비밀번호가 비어 있어 그냥 통과해. 결과는 무인증 관리 명령 실행이야. 같은 날 JMX/RMI 인증 우회(CVE-2026-90908)도 나왔어.",
-    "cvss": null,
+    "cvss": 9.3,
     "kev": false,
     "poc": false,
     "tags": [
@@ -634,7 +634,12 @@
         "url": "https://www.cve.org/CVERecord?id=CVE-2026-110003"
       }
     ],
-    "history": [],
+    "history": [
+      {
+        "date": "2026-11-18",
+        "note": "CVE 레코드에 CVSS 9.3 점수가 추가됨(CISA ADP SSVC: Exploitation none, Automatable yes). 악용, PoC 변화 없음."
+      }
+    ],
     "detail": {
       "rootCause": "관리 REST 인터페이스의 인증 흐름에서 검사 순서가 틀린 로직 결함이야(CWE-288). secure-admin이 꺼진 상태의 원격 요청 거부 검사는 X-GlassFish-authToken 헤더의 '존재' 여부로 면제되는데, 토큰 유효성 검증은 그 뒤에 일어나. 토큰이 무효하면 오류로 끝나지 않고 사용자 이름, 비밀번호 인증으로 폴백하고, 기본 도메인(domain1)의 admin 계정은 비밀번호가 비어 있어서 자격 증명 없이 성공해. 즉 '원격에서는 빈 비밀번호 admin을 쓸 수 없다'는 보호가 헤더 하나로 무력화돼.",
       "trigger": "원격, 무인증. 관리 포트(기본 4848)에 닿을 수 있고, 관리자 비밀번호를 설정하지 않은 기본 도메인이어야 해.",
@@ -1112,6 +1117,89 @@
           "label": "unrealircd 커밋 05b5f5f 발췌",
           "lang": "C",
           "code": "\tif (BadPtr(value))\n\t\treturn 0;\n\n+\tif (strpbrk(value, \" ;\\\\\\r\\n\")) // IRC 필드, 태그, 메시지 구분자 차단\n+\t\treturn 0;\n\n\tif (IsServer(client))\n\t\treturn 1;"
+        }
+      ]
+    },
+    "deepDive": null
+  },
+  {
+    "cve": "CVE-2026-114938",
+    "date": "2026-11-18",
+    "grade": "orange",
+    "title": "Java4Shell: HotSpot AVX-512 Base64 디코드 스텁의 꼬리 처리 경계 누락으로 힙 오버플로",
+    "product": "OpenJDK, Oracle Java SE 17, 21, 25, 27 (AVX-512 VBMI 지원 x86-64 CPU), GraalVM for JDK 17, 21",
+    "summary": "java.util.Base64 디코더가 JIT에서 쓰는 x86-64 AVX-512 VBMI 인트린식 스텁이 남은 입력이 4바이트 미만인 꼬리를 자체 처리하면서 패딩 보정으로 출력 길이를 계산하는데, 이 경로에 하한 검사가 없어 64바이트 마스크 저장이 목적 버퍼 밖으로 나갈 수 있어. Calif가 공개했고 Oracle 11월 CSPU와 OpenJDK 17.0.21.1, 21.0.13.1, 25.0.5.1에서 수정됐어. 공격자가 넣은 Base64 문자열을 서버가 디코드하기만 하면 되는 무인증 원격 조건이지만, AVX-512 VBMI CPU와 C2 컴파일된 경로가 전제라 CVSS는 AC:H 8.1이야.",
+    "cvss": 8.1,
+    "kev": false,
+    "poc": false,
+    "tags": [
+      "java",
+      "openjdk",
+      "hotspot",
+      "jit",
+      "intrinsic",
+      "avx-512",
+      "base64",
+      "heap-overflow",
+      "oracle-cspu"
+    ],
+    "links": [
+      {
+        "label": "Calif Java4Shell 원문",
+        "url": "https://calif.io/java4shell/"
+      },
+      {
+        "label": "Oracle CSPU 2026년 11월",
+        "url": "https://www.oracle.com/security-alerts/cspunov2026.html"
+      },
+      {
+        "label": "openjdk/jdk17u 수정 커밋 8ea7315 (8393212)",
+        "url": "https://github.com/openjdk/jdk17u/commit/8ea73158afc9f2c62f72df68beb8723032bf695e"
+      },
+      {
+        "label": "원 최적화 커밋 JDK-8268276 (jdk17u 07050b0)",
+        "url": "https://github.com/openjdk/jdk17u/commit/07050b000ce20350c55505fbc5595c0b6c3052b5"
+      },
+      {
+        "label": "Equixly 분석",
+        "url": "https://equixly.com/blog/2026/11/17/cve-2026-114938-pre-auth-heap-overflow-in-java-17-21-and-25/"
+      },
+      {
+        "label": "Orca Security 분석",
+        "url": "https://orca.security/resources/research/java4shell-critical-openjdk-base64-decoder-flaw-could-allow-unauthenticated-remote-code-execution/"
+      },
+      {
+        "label": "SentinelOne",
+        "url": "https://www.sentinelone.com/blog/java4shell-vulnerability-in-openjdk-enables-rce-on-avx-512-cpus/"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-114938"
+      },
+      {
+        "label": "CVE.org",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-114938"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "HotSpot은 Base64.Decoder.decodeBlock()을 인트린식으로 바꾸고, x86-64에서 AVX-512 VBMI가 있으면 stubGenerator_x86_64.cpp의 generate_base64_decodeBlock() 스텁(JDK-8268276, JDK 17에서 도입)을 써. 이 스텁은 256바이트, 64바이트 단위로 처리한 뒤 L_finalBit에서 남은 1~63바이트 꼬리를 마스크 로드와 마스크 저장(evmovdqub)으로 직접 처리해. 출력 길이는 output_size = (length/4)*3으로 잡고, 마지막 바이트가 '='면 L_padding에서 output_size를 1~2 줄인 다음 bzhiq로 출력 마스크를 만들어. length가 4 미만이면 (length/4)*3이 0인데 패딩 보정으로 음수가 될 수 있고, bzhi는 인덱스 하위 8비트만 보며 피연산자 폭(64) 이상이면 비트를 하나도 안 지우기 때문에 마스크가 64비트 전부 1이 돼 dest에 64바이트를 그대로 써(추정, 수정 diff와 스텁 코드를 읽고 한 해석). 결국 '남은 길이가 최소 한 블록(4바이트)'이라는 불변식을 확인하지 않은 경계 검사 누락이고, 결과는 Java 힙의 byte[] 뒤쪽 경계 밖 쓰기(CWE-787 계열).",
+      "trigger": "원격, 무인증 가능. 서버가 공격자 입력(HTTP 헤더, 토큰, JSON 필드 등)을 java.util.Base64 디코더로 디코드하고, 그 경로가 C2로 컴파일돼 인트린식 스텁을 타야 해. CPU가 AVX-512 VBMI를 지원해야 해(Intel Ice Lake 이후 서버, AMD Zen 4 이후 등). JDK 17 이후가 대상이고 Oracle 레코드상 8u는 perf 빌드만 해당. 어떤 디코더 변형(기본, URL, MIME)과 어떤 입력 모양이 꼬리 경로에 닿는지는 공개 자료 요약 수준으로만 확인했어.",
+      "exploitation": "스텁이 디코드 결과 배열 끝을 넘어 최대 수십 바이트를 쓰면서 인접한 Java 힙 객체 헤더나 필드를 덮는 프리미티브가 생겨. Calif는 이를 원격 코드 실행까지 이었다고 주장하지만 연구자들 사이에 실전 난이도(힙 배치, CPU 조건) 평가가 갈려. 공개 PoC 코드는 확인 못 했고, CISA ADP SSVC는 Exploitation none, 악용 보고 없음.",
+      "patch": "jdk17u 커밋 8ea7315(8393212 'Base64 optimization improvements', jdk 메인라인 e56f69c 백포트)은 L_finalBit 바로 뒤에 cmpl(length, 4); jcc(less, L_bruteForce) 4줄을 넣어 4바이트 미만 꼬리는 스텁의 마스크 경로 대신 스칼라 폴백으로 보내. 수정 버전은 OpenJDK 17.0.21.1, 21.0.13.1, 25.0.5.1 태그(같은 묶음에 8387541 StringBuilder, 8390694 vector masks 등 다른 보안 수정도 포함)와 Oracle 2026년 11월 CSPU. 패치 전 임시 완화로 Base64 인트린식을 끄는 JVM 옵션(-XX:-UseBASE64Intrinsics)이 거론되지만 벤더 공식 완화로는 확인 못 함(추정).",
+      "detection": "전용 ETW나 Sysmon 이벤트 없음. 실패한 시도는 JVM 크래시로 남을 가능성이 커서 hs_err_pid*.log에 컴파일 스텁(base64 decodeBlock 부근) 프레임이 찍힌 크래시가 반복되면 의심 신호(추정). 자산 관점에서는 java -version으로 17.0.21.1, 21.0.13.1, 25.0.5.1 미만을 찾고, /proc/cpuinfo 또는 CPU 모델로 avx512vbmi 지원 여부를 함께 봐.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "openjdk/jdk17u stubGenerator_x86_64.cpp 수정 전 꼬리 처리 발췌",
+          "lang": "cpp",
+          "code": "__ BIND(L_finalBit);              // 남은 1~63바이트\n__ movq(rax, -1);\n__ bzhiq(rax, rax, length);       // 입력 마스크\n__ movl(output_size, length);\n__ shrl(output_size, 2);          // (len/4)*3, len<4면 0\n// L_padding: '=' 보이면 output_size 감소 -> 음수 가능\n__ bzhiq(output_mask, output_mask, output_size); // 인덱스 0xFF면 마스크 그대로\n__ evmovdqub(Address(dest, dp), k1, tmp, true, Assembler::AVX_512bit); // 64바이트 저장"
+        },
+        {
+          "kind": "fix",
+          "label": "openjdk/jdk17u 커밋 8ea7315 (8393212) 발췌",
+          "lang": "cpp",
+          "code": "__ BIND(L_finalBit);\n// Now have 1 to 63 bytes left to decode\n\n+// A padded Base64 tail shorter than one complete block is handled by Java.\n+__ cmpl(length, 4);                  // 4바이트 미만이면\n+__ jcc(Assembler::less, L_bruteForce); // 마스크 경로 대신 스칼라 폴백"
         }
       ]
     },
@@ -1890,6 +1978,66 @@
       "trigger": "공개 설명은 조작된 페이지. 추가 전제는 확인 못 했어.",
       "exploitation": "이론상 가능. 악용 보고 없음.",
       "patch": "157.0.8103.38."
+    },
+    "deepDive": null
+  },
+  {
+    "cve": "CVE-2026-121757",
+    "date": "2026-11-18",
+    "grade": "green",
+    "title": "glibc iconv CP949 디코더가 잘못된 바이트열에서 포인터를 두 번 전진시켜 입력 끝 너머를 읽음",
+    "product": "GNU C Library 2.1 이상 (iconv, CP949(UHC) to UTF-8, //IGNORE)",
+    "summary": "glibc의 CP949(한국어 확장 완성형, UHC) 디코더가 '\\xa2\\xe8' 같은 잘못된 2바이트 시퀀스를 만나면 입력 위치 포인터를 두 번 전진시켜. 목적지에 //IGNORE가 붙어 오류를 건너뛰고 계속 진행하는 모드에서 이 시퀀스가 버퍼 끝에 있으면 입력 버퍼 너머를 읽어 크래시가 나. 같은 날 ISO-2022-CN-EXT(CVE-2026-121758), IBM1390/1399(CVE-2026-124024)의 비슷한 과다 읽기도 같이 공개됐어.",
+    "cvss": 5.9,
+    "kev": false,
+    "poc": false,
+    "tags": [
+      "glibc",
+      "iconv",
+      "cp949",
+      "korean",
+      "buffer-over-read",
+      "cwe-126"
+    ],
+    "links": [
+      {
+        "label": "glibc 권고 GLIBC-SA-2026-0029",
+        "url": "https://sourceware.org/git/?p=glibc.git;a=blob_plain;f=advisories/GLIBC-SA-2026-0029"
+      },
+      {
+        "label": "sourceware bugzilla 35016",
+        "url": "https://sourceware.org/bugzilla/show_bug.cgi?id=35016"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-121757"
+      },
+      {
+        "label": "CVE.org",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-121757"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "glibc iconv 모듈(iconvdata/uhc.c 계열)의 디코드 루프는 입력 포인터 inptr를 문자 단위로 전진시키고 루프 조건으로 inend와 비교해. 잘못된 시퀀스를 만나면 STANDARD_FROM_LOOP_ERR_HANDLER가 //IGNORE 모드에서 해당 바이트를 건너뛰는데, CVE 설명대로라면 이 오류 경로에서 포인터가 한 번 더 전진해 inptr가 inend를 넘어가. 루프 종료 조건이 'inptr == inend'에 기대거나 다음 반복에서 inptr[1]을 읽으면 경계 밖 읽기가 돼. 깨진 불변식은 '각 반복은 inptr를 정확히 소비한 바이트 수만큼만 전진시킨다'. CWE-126 버퍼 과다 읽기.",
+      "trigger": "원격 가능하지만 조건이 좁아: 애플리케이션이 iconv_open(\"UTF-8//IGNORE\", \"CP949\")처럼 //IGNORE를 켜고, 공격자가 입력 바이트와 인코딩 선택을 모두 통제해야 해. 그 시퀀스가 입력 버퍼 맨 끝에 와야 함.",
+      "exploitation": "읽기 전용 과다 읽기라 영향은 크래시(DoS)로 평가돼(A:H, C:N). 쓰기 프리미티브는 없어. PoC, 악용 보고 없음.",
+      "patch": "glibc 권고 GLIBC-SA-2026-0029와 bugzilla 35016에서 수정. 실제 커밋 diff는 이번에 git으로 확인 못 했어(GitHub 미러가 최신이 아니었음). 배포판 glibc 업데이트로 반영.",
+      "detection": "공개 지표 없음. iconv를 쓰는 서비스(메일 게이트웨이, 문서 변환기, PHP iconv())의 SIGSEGV 크래시가 CP949 입력과 함께 반복되는지 정도.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "재구성, 실제 소스 아님, 추정 (CVE 설명 기반)",
+          "lang": "c",
+          "code": "while (inptr != inend) {\n  ch = inptr[0];\n  if (invalid_pair(ch, inptr[1])) {\n    if (!ignore_errors) return __GCONV_ILLEGAL_INPUT;\n    inptr += 2;          /* 오류 처리에서 이미 2바이트 소비 */\n    ++*irreversible;\n    inptr += 2;          /* 공통 경로에서 한 번 더 전진 -> inend 초과 */\n    continue;            /* 다음 반복에서 inptr[0] 경계 밖 읽기 */\n  }"
+        },
+        {
+          "kind": "fix",
+          "label": "재구성, 실제 소스 아님 (수정 방향)",
+          "lang": "c",
+          "code": "while (inptr < inend) {             /* != 대신 < 로 경계 확인 */\n  if (inptr + 1 >= inend) return __GCONV_INCOMPLETE_INPUT;\n  if (invalid_pair(inptr[0], inptr[1])) {\n    STANDARD_FROM_LOOP_ERR_HANDLER (2); /* 소비는 정확히 한 번만 */\n  }"
+        }
+      ]
     },
     "deepDive": null
   },
@@ -2702,12 +2850,24 @@
       {
         "label": "The Hacker News 패치 우회 체인",
         "url": "https://thehackernews.com/2026/11/new-n-central-exploits-work-against.html"
+      },
+      {
+        "label": "The Hacker News Hotfix 3, 마이너 공격",
+        "url": "https://thehackernews.com/2026/11/n-able-patches-17-n-central-flaws-as.html"
+      },
+      {
+        "label": "N-able 대응 업데이트",
+        "url": "https://www.n-able.com/blog/n-able-vulnerability-remediation-update"
       }
     ],
     "history": [
       {
         "date": "2026-11-14",
         "note": "Hotfix 2 적용 서버에도 통한다는 새 체인 4EverAble2Shell(및 Windows 에이전트 SYSTEM 체인)이 공개됐고, PoC 공개 몇 시간 만에 악용됐다는 보도. N-able은 레거시 API 비활성화를 권고. 새 체인의 CVE 번호와 CISA KEV 등재는 확인 못 함."
+      },
+      {
+        "date": "2026-11-18",
+        "note": "N-able이 Hotfix 3으로 N-central 취약점 17건을 추가 수정하고 레거시 API를 제거. 이전 Able2Shell, 4EverAble2Shell 버그로 크립토 마이너를 심는 실제 공격이 여러 곳에서 보고됨. 악용된 체인과 이 CVE의 대응 관계, CISA KEV 등재는 확인 못 해 등급은 유지."
       }
     ],
     "detail": {
@@ -3848,6 +4008,52 @@
     "deepDive": null
   },
   {
+    "cve": "CVE-2026-130021",
+    "date": "2026-11-18",
+    "grade": "orange",
+    "title": "Firefox 오디오, 비디오 재생 컴포넌트 UAF (160.0.1 긴급 수정)",
+    "product": "Firefox 160.0.1 미만",
+    "summary": "Mozilla가 Firefox 160.0.1 포인트 릴리스로 Audio/Video Playback 컴포넌트의 use-after-free를 고쳤어(MFSA 2026-130). 같은 날 Android용 CanvasWebGL 경계 조건 권한 상승 CVE-2026-130020도 함께 공개. 버그 세부는 비공개고 악용 언급이나 PoC는 없어.",
+    "cvss": null,
+    "kev": false,
+    "poc": false,
+    "tags": [
+      "firefox",
+      "mozilla",
+      "browser",
+      "uaf",
+      "media",
+      "cwe-416"
+    ],
+    "links": [
+      {
+        "label": "MFSA 2026-130",
+        "url": "https://www.mozilla.org/security/advisories/mfsa2026-130/"
+      },
+      {
+        "label": "Bugzilla 2088644 (비공개)",
+        "url": "https://bugzilla.mozilla.org/show_bug.cgi?id=2088644"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-130021"
+      },
+      {
+        "label": "CVE.org",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-130021"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "공개된 세부 없음. 미디어 재생 파이프라인(디먹서, 디코더, 오디오 싱크 객체)에서 해제된 객체를 다른 스레드나 콜백이 계속 참조하는 수명 관리 오류로 보이지만 버그가 비공개라 확인 못 함(추정). CWE-416.",
+      "trigger": "원격, 사용자가 악성 미디어나 페이지를 열어야 함. 미디어 재생은 보통 콘텐츠 프로세스(샌드박스 안)에서 일어나.",
+      "exploitation": "일반적으로 이 클래스는 콘텐츠 프로세스 내 코드 실행 프리미티브까지 갈 수 있고, 시스템 장악에는 별도 샌드박스 탈출이 필요해. 악용 보고 없음, PoC 없음.",
+      "patch": "Firefox 160.0.1. 정기 릴리스 사이의 단일 버그 포인트 릴리스라는 점만 확인됨.",
+      "detection": "공개 지표 없음. 크래시 리포터 기록(about:crashes)에 미디어 스레드 크래시가 반복되는지 정도."
+    },
+    "deepDive": null
+  },
+  {
     "cve": "CVE-2026-13684",
     "date": "2026-11-05",
     "grade": "red",
@@ -4262,6 +4468,67 @@
     "deepDive": null
   },
   {
+    "cve": "CVE-2026-82150",
+    "date": "2026-11-18",
+    "grade": "orange",
+    "title": "Dell SupportAssist OS Recovery 매니페스트 서명 검증 우회 외 4건",
+    "product": "Dell SupportAssist OS Recovery 5.5.16.3 미만 (Dell PC 기본 탑재)",
+    "summary": "Dell PC에 기본으로 깔리는 복구 도구 SupportAssist OS Recovery에서 DSA-2026-426으로 5건이 한꺼번에 고쳐졌어. 인접 네트워크 공격자가 매니페스트 서명 검증을 우회해 높은 권한으로 코드를 실행시킬 수 있는 이 건(8.0)과, 로컬 일반 사용자 권한 상승 CVE-2026-82143(7.8, 부적절한 권한 검사), 무결성 검사 없는 코드 다운로드 CVE-2026-82138, 82136, 인증서 검증 미흡 CVE-2026-82139가 묶여 있어. 기술 세부, PoC, 악용 보고는 없어.",
+    "cvss": 8.0,
+    "kev": false,
+    "poc": false,
+    "tags": [
+      "dell",
+      "supportassist",
+      "windows",
+      "oem",
+      "signature-bypass",
+      "lpe",
+      "cwe-345"
+    ],
+    "links": [
+      {
+        "label": "Dell DSA-2026-426",
+        "url": "https://www.dell.com/support/kbdoc/en-us/000511813/dsa-2026-426-security-update-for-dell-supportassist-os-recovery-for-multiple-vulnerabilities"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-82150"
+      },
+      {
+        "label": "CVE.org",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-82150"
+      },
+      {
+        "label": "CVE-2026-82143 (LPE)",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-82143"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "공개된 세부 없음. CVE 설명상 업데이트나 복구 이미지 다운로드에 쓰는 매니페스트의 서명 검증을 우회할 수 있고(CWE-345), 별도 건으로 다운로드한 코드의 무결성 검사 누락(CWE-494)과 인증서 검증 미흡(CWE-295)이 있어. 즉 '다운로드한 것은 Dell 서명된 것만 높은 권한으로 실행한다'는 신뢰 사슬이 여러 지점에서 끊긴 형태로 보여(추정). 82143은 SYSTEM 서비스가 일반 사용자 요청을 권한 확인 없이 처리하는 부적절한 인가(CWE-285)로 분류.",
+      "trigger": "82150: 인접 네트워크(같은 LAN, 공용 Wi-Fi 등)의 무인증 공격자, 사용자 상호작용 필요(복구나 다운로드 동작이 일어나야 함). 82143: 로컬 일반 사용자.",
+      "exploitation": "다운로드 경로를 가로챈 공격자가 위조 매니페스트와 페이로드를 넣으면 SupportAssist의 높은 권한 프로세스가 그걸 실행하는 흐름으로 이어진다고 설명돼. 82143은 로컬 일반 사용자에서 SYSTEM급 권한 상승. 공개 PoC, 악용 보고 없음.",
+      "patch": "SupportAssist OS Recovery 5.5.16.3으로 업데이트. 쓰지 않는다면 제거도 선택지. 학교 Dell PC처럼 같은 이미지로 깔린 장비는 일괄 버전 확인 필요.",
+      "detection": "공개 지표 없음. SupportAssist 계열 서비스 프로세스가 비표준 경로(사용자 쓰기 가능 경로, %TEMP%)의 실행 파일을 띄우는지(Sysmon EID 1 부모 프로세스), 서명되지 않은 이미지 로드(Sysmon EID 7 Signed=false)를 볼 수 있어(추정).",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "재구성, 실제 소스 아님, 추정 (신뢰 사슬이 끊기는 지점)",
+          "lang": "python",
+          "code": "manifest = download(MANIFEST_URL)\nif not verify_signature(manifest):   # 우회 가능한 검증 (CWE-345)\n    abort()\npkg = download(manifest.package_url)  # 패키지 자체 해시 대조 없음 (CWE-494)\nrun_as_system(pkg)                    # 높은 권한으로 실행"
+        },
+        {
+          "kind": "fix",
+          "label": "재구성, 실제 소스 아님 (수정 방향)",
+          "lang": "python",
+          "code": "manifest = download(MANIFEST_URL)\nverify_signature_strict(manifest, pinned_dell_root)  # 체인 전체와 서명자 고정\npkg = download(manifest.package_url)\nassert sha256(pkg) == manifest.sha256                # 서명된 매니페스트의 해시와 대조\nassert authenticode_signer(pkg) == 'Dell Inc.'       # 실행 직전 재검증\nrun_as_system(pkg)"
+        }
+      ]
+    },
+    "deepDive": null
+  },
+  {
     "cve": "CVE-2026-83844",
     "date": "2026-11-06",
     "grade": "gray",
@@ -4372,6 +4639,52 @@
           "code": "void onDocumentEvent(Doc& d, Event e) {\n    Macro* m = d.boundMacro(e);\n    if (!d.macroSecurity().allowsDocumentMacros())  // 다른 문서와 같은 게이트\n        return;\n    m->run();\n}"
         }
       ]
+    },
+    "deepDive": null
+  },
+  {
+    "cve": "CVE-2026-91569",
+    "date": "2026-11-18",
+    "grade": "orange",
+    "title": "Oracle WebLogic TopLink Integration 무인증 HTTP 원격 장악 (CVSS 10.0)",
+    "product": "Oracle WebLogic Server 12.2.1.4.0, 14.1.1.0.0, 14.1.2.0.0, 15.1.1.0.0",
+    "summary": "Oracle 2026년 11월 CSPU(월간 보안 패치)에서 고쳐진 WebLogic TopLink Integration 컴포넌트 취약점이야. 무인증 공격자가 HTTP로 서버를 장악할 수 있다고 Oracle이 CVSS 10.0(S:C)으로 매겼고, 같은 컴포넌트에 9.8짜리(CVE-2026-91570, 91583, 91585)도 함께 나왔어. 기술 세부는 공개 안 됐고 악용 보고, PoC 모두 없어.",
+    "cvss": 10.0,
+    "kev": false,
+    "poc": false,
+    "tags": [
+      "oracle",
+      "weblogic",
+      "toplink",
+      "unauthenticated",
+      "rce",
+      "oracle-cspu"
+    ],
+    "links": [
+      {
+        "label": "Oracle CSPU 2026년 11월",
+        "url": "https://www.oracle.com/security-alerts/cspunov2026.html"
+      },
+      {
+        "label": "SecurityOnline 11월 업데이트 정리",
+        "url": "https://securityonline.info/oracle-november-2026-update-655-flaws/"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-91569"
+      },
+      {
+        "label": "CVE.org",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-91569"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "공개된 세부 없음. Oracle 권고는 컴포넌트를 TopLink Integration(EclipseLink/TopLink 영속성 계층 연동)으로만 밝혀. 과거 WebLogic의 무인증 10점대 버그들은 대부분 HTTP나 T3/IIOP로 들어온 데이터를 역직렬화하거나 표현식으로 평가하는 경로였지만, 이번 건이 그런 클래스인지는 확인 못 함(추정조차 근거 부족).",
+      "trigger": "원격, 무인증, 사용자 상호작용 없음, HTTP 접근만 필요(AV:N/AC:L/PR:N/UI:N). 관리 콘솔이나 애플리케이션 포트가 외부에 열린 WebLogic이 대상.",
+      "exploitation": "Oracle 분류상 서버 장악(takeover)과 범위 변경(S:C)까지 가능. 공개 PoC, 악용 보고 없음. WebLogic은 과거 패치 공개 후 diff 분석으로 수일에서 수주 내 익스플로잇이 나온 이력이 많아.",
+      "patch": "Oracle 2026년 11월 CSPU 패치. 세부 변경 내용은 비공개. 임시로는 WebLogic 관리 및 애플리케이션 포트를 신뢰 구간으로 제한.",
+      "detection": "공개된 지표 없음. WebLogic 액세스 로그의 비정상 요청과 java 프로세스가 cmd.exe, powershell.exe, /bin/sh를 자식으로 띄우는 프로세스 트리(Sysmon EID 1, Linux auditd execve)를 일반 지표로 봐."
     },
     "deepDive": null
   },
