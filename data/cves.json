@@ -1206,6 +1206,79 @@
     "deepDive": null
   },
   {
+    "cve": "CVE-2026-115731",
+    "date": "2026-11-19",
+    "grade": "red",
+    "title": "Puppet Server 보고서 rich data 역직렬화 RCE, KEV 등재",
+    "product": "Perforce Puppet Enterprise 2023.8.13, 2025.12.1, 2026.0.1 미만 (Puppet Server, OpenVox 서버 포함)",
+    "summary": "에이전트가 PUT으로 올리는 보고서를 Puppet Server가 처리할 때 rich data 형식의 타입 정보를 그대로 믿고 객체를 복원해서, CA 서명 에이전트 인증서만 있으면 서버 서비스 계정으로 코드가 실행돼. autosign을 검증 없이 켜 둔 곳은 인증서를 그냥 받을 수 있어 사실상 무인증이야. CISA가 11월 17일 KEV에 넣었고 공개 PoC도 돌고 있어.",
+    "cvss": 9.4,
+    "kev": true,
+    "poc": true,
+    "tags": [
+      "puppet",
+      "deserialization",
+      "configuration-management",
+      "autosign",
+      "kev",
+      "cwe-502",
+      "cwe-94"
+    ],
+    "links": [
+      {
+        "label": "Perforce 권고 Report Deserialization Code Execution",
+        "url": "https://portal.perforce.com/s/cve/a91Qi000003IaHpIAK/report-deserialization-code-execution"
+      },
+      {
+        "label": "CISA KEV 카탈로그",
+        "url": "https://www.cisa.gov/known-exploited-vulnerabilities-catalog"
+      },
+      {
+        "label": "The Hacker News 악용 보도",
+        "url": "https://thehackernews.com/2026/11/hackers-exploiting-critical-puppet-rce.html"
+      },
+      {
+        "label": "SecurityWeek 악용 보도",
+        "url": "https://www.securityweek.com/critical-perforce-puppet-rce-exploited-in-attacks/"
+      },
+      {
+        "label": "Red Hat CVE 페이지",
+        "url": "https://access.redhat.com/security/cve/cve-2026-115731"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-115731"
+      },
+      {
+        "label": "CVE.org",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-115731"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "Puppet의 보고서 처리 코드가 에이전트가 보낸 보고서 본문을 rich data(Pcore 직렬화) 형식으로 해석하면서, 데이터 안에 적힌 타입 정보로 객체를 다시 만들어. 보고서는 신뢰 경계 바깥(에이전트)에서 오는 데이터인데 서버는 그 안의 타입 선택을 제한하지 않았고, 그래서 '데이터를 읽는다'가 '공격자가 고른 타입의 생성 로직을 실행한다'로 바뀌어. 버그 클래스는 신뢰할 수 없는 데이터 역직렬화(CWE-502)이고 결과는 코드 주입(CWE-94). 어떤 타입, 어떤 생성 경로가 코드 실행으로 이어지는지는 벤더 권고에 공개되지 않았어.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "재구성, 실제 소스 아님 (추정)",
+          "lang": "ruby",
+          "code": "# PUT /puppet/v3/report 처리 (재구성)\ndata = JSON.parse(request.body)\n# rich data의 타입 키를 그대로 해석해서 객체를 복원\nreport = FromDataConverter.convert(data)   # 타입 선택권이 에이전트에게 있음\nprocess_report(report)"
+        },
+        {
+          "kind": "fix",
+          "label": "재구성, 실제 소스 아님 (수정 방향 추정)",
+          "lang": "ruby",
+          "code": "data = JSON.parse(request.body)\n# 보고서에 필요한 타입만 허용하고 나머지 타입 표기는 거부\nreport = convert_report_data(data, allowed: REPORT_TYPES)\nraise BadRequest unless report.is_a?(Puppet::Transaction::Report)\nprocess_report(report)"
+        }
+      ],
+      "trigger": "원격. CA가 서명한 에이전트 인증서가 필요해(CVSS PR:L). 다만 autosign이 true이거나 약한 정책 스크립트로 CSR을 자동 서명하는 환경이면 네트워크로 Puppet Server(기본 8140 포트)에 닿는 누구나 인증서를 받아 무인증 공격이 돼. 이미 관리 대상 노드 하나를 장악한 공격자에게는 그 노드 인증서로 충분해.",
+      "exploitation": "조작한 보고서 하나로 Puppet Server 프로세스(서비스 계정) 권한의 코드 실행을 얻어. Puppet Server는 카탈로그를 만들어 모든 관리 노드에 내려보내는 중앙 서버라서, 여기서 서버 장악이 곧 관리 대상 전체 노드에 대한 명령 배포 권한으로 이어질 수 있어(추정, 조직 구성에 따라 다름). 실제 악용과 공개 PoC가 보고됐고 CISA가 11월 17일 KEV에 등재했어. 악용 주체와 규모는 공개된 세부 없음.",
+      "patch": "Puppet Enterprise 2023.8.13, 2025.12.1, 2026.0.1에서 수정. 오픈소스 Puppet, OpenVox 쪽도 패키지 업데이트가 나왔어(FreeBSD openvox 등). 패치 diff는 공개 저장소에서 확인 못 함. 임시 완화는 autosign 끄기 또는 강한 검증(사전 공유 비밀, 정책 스크립트)으로 바꾸기, 8140 포트를 관리 노드 대역으로만 제한하기.",
+      "detection": "Puppet Server access 로그에서 PUT /puppet/v3/report/<certname> 요청 중 처음 보는 certname이나 관리 대역 밖 IP. CA 쪽에서 최근 autosign으로 서명된 인증서 목록(puppetserver ca list --all) 점검. 서버에서 puppetserver JVM(java) 아래로 sh, bash, curl 같은 자식 프로세스가 생기는지. Linux라 ETW는 해당 없고, auditd execve나 EDR 프로세스 트리로 봐야 해."
+    },
+    "deepDive": null
+  },
+  {
     "cve": "CVE-2026-116307",
     "date": "2026-11-13",
     "grade": "green",
@@ -3738,6 +3811,79 @@
     "deepDive": null
   },
   {
+    "cve": "CVE-2026-129448",
+    "date": "2026-11-19",
+    "grade": "red",
+    "title": "Apache Roller XML-RPC 확장 타입 사전 인증 역직렬화 RCE, 실제 악용",
+    "product": "Apache Roller 4.0.0 이상 6.1.5 이하 (6.1.6에서 수정)",
+    "summary": "Roller의 XML-RPC 엔드포인트가 Apache XML-RPC 라이브러리의 벤더 확장 타입을 켠 채로 배포돼서, 인증 전에 요청 본문의 Java 직렬화 객체를 복원해. 9월에 CVE-2026-82384로 6.1.5만 영향이라고 냈던 걸 4.0.0까지 넓혀 다시 낸 것이고, Apache가 실제 악용 중이라고 밝혔어. 관리 UI에서 XML-RPC를 끄는 걸로는 안 막혀.",
+    "cvss": 9.8,
+    "kev": false,
+    "poc": false,
+    "tags": [
+      "apache-roller",
+      "java",
+      "deserialization",
+      "xml-rpc",
+      "pre-auth",
+      "in-the-wild",
+      "cwe-502"
+    ],
+    "links": [
+      {
+        "label": "Apache 공지 (lists.apache.org)",
+        "url": "https://lists.apache.org/thread/cc0jck13nb9vvcmzxzwotr6n16mx28z9"
+      },
+      {
+        "label": "apache/roller PR 171",
+        "url": "https://github.com/apache/roller/pull/171"
+      },
+      {
+        "label": "선행 CVE-2026-82384",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-82384"
+      },
+      {
+        "label": "BleepingComputer 악용 보도",
+        "url": "https://www.bleepingcomputer.com/news/security/apache-warns-of-roller-rce-vulnerability-exploited-in-attacks/"
+      },
+      {
+        "label": "The Hacker News",
+        "url": "https://thehackernews.com/2026/11/critical-apache-roller-rce-flaw-under.html"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-129448"
+      },
+      {
+        "label": "CVE.org",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-129448"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "Roller는 /roller-services/xmlrpc에 Apache XML-RPC 라이브러리의 서블릿을 매핑하는데, web.xml에서 enabledForExtensions를 true로 둬서 라이브러리의 벤더 확장 타입(ex 네임스페이스)을 받아들였어. 확장 타입 중 직렬화 타입은 요청 XML 안의 base64 데이터를 Java ObjectInputStream으로 복원하는데, 이건 XML 파싱 단계에서 일어나고 Roller의 인증(사용자명, 비밀번호가 메서드 인자로 들어옴)은 그 뒤 핸들러에서야 검사돼. 즉 '파싱 후 인증' 순서 때문에 무인증 역직렬화(CWE-502)가 돼. Roller 자체는 표준 XML-RPC 값 타입만 쓰니 확장 기능은 처음부터 필요 없었어. 같은 라이브러리 설정 문제는 예전 Apache XML-RPC 자체 CVE(CVE-2016-5003, CVE-2019-17570)와 같은 계열이야.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "apache/roller 커밋 6d424d7 발췌 (수정 전 web.xml)",
+          "lang": "xml",
+          "code": "<init-param>\n    <!-- 라이브러리 벤더 확장 타입 허용: 직렬화 타입까지 파싱 -->\n    <param-name>enabledForExtensions</param-name>\n    <param-value>true</param-value>\n</init-param>"
+        },
+        {
+          "kind": "fix",
+          "label": "apache/roller 커밋 6d424d7, 44e7064 발췌",
+          "lang": "java",
+          "code": "// web.xml: enabledForExtensions true -> false\n// 새 필터를 서블릿 앞에 두어 꺼진 서비스는 본문을 읽기 전에 차단\nif (!WebloggerRuntimeConfig.getBooleanProperty(\"webservices.enableXmlRpc\")) {\n    LOG.warn(\"XML-RPC service is disabled; rejecting request\");\n    httpResponse.setStatus(HttpServletResponse.SC_NOT_FOUND);\n    return;  // 서블릿(=파서)까지 가지 않음\n}\nchain.doFilter(request, response);"
+        }
+      ],
+      "trigger": "원격, 무인증, 사용자 상호작용 없음. /roller-services/xmlrpc 서블릿 매핑이 살아 있으면 돼. 관리 UI의 XML-RPC 비활성화 설정은 구버전에서 파싱 뒤에 확인돼서 방어가 안 돼.",
+      "exploitation": "직렬화 객체 복원 과정에서 클래스패스에 있는 가젯 체인이 실행돼 Roller가 돌아가는 서블릿 컨테이너 권한으로 코드 실행까지 가. 어떤 가젯 체인이 쓰였는지는 공개된 세부 없음. Apache가 실제 악용을 확인했다고 명시했지만, 작성 시점 CISA KEV에는 없고 CISA ADP SSVC도 11월 17일 기준 Exploitation none이었어. trickest 목록에 공개 PoC는 아직 없음.",
+      "patch": "6.1.6에서 (1) enabledForExtensions를 false로 바꾸고 (2) XmlRpcEnabledFilter를 /roller-services/xmlrpc 앞(REQUEST, FORWARD, INCLUDE 디스패처 모두)에 걸어 webservices.enableXmlRpc가 꺼져 있으면 404로 본문을 읽지 않게 했어. 바로 못 올리면 WEB-INF/web.xml에서 enabledForExtensions를 false로 바꾸거나 xmlrpc 서블릿 매핑을 지우고 재시작.",
+      "detection": "웹 로그에서 POST /roller-services/xmlrpc, 특히 평소 XML-RPC를 안 쓰는 블로그에 대한 요청. 요청 본문에 ws.apache.org/xmlrpc/namespaces/extensions 네임스페이스나 serializable 요소가 있으면 강한 지표. 호스트에서는 Tomcat 등 서블릿 컨테이너 Java 프로세스 아래로 셸 자식 프로세스가 뜨는지 확인. Windows 호스트라면 Sysmon 이벤트 1(ProcessCreate)에서 ParentImage가 java.exe인 cmd.exe, powershell.exe."
+    },
+    "deepDive": null
+  },
+  {
     "cve": "CVE-2026-129456",
     "date": "2026-11-15",
     "grade": "green",
@@ -4050,6 +4196,249 @@
       "exploitation": "일반적으로 이 클래스는 콘텐츠 프로세스 내 코드 실행 프리미티브까지 갈 수 있고, 시스템 장악에는 별도 샌드박스 탈출이 필요해. 악용 보고 없음, PoC 없음.",
       "patch": "Firefox 160.0.1. 정기 릴리스 사이의 단일 버그 포인트 릴리스라는 점만 확인됨.",
       "detection": "공개 지표 없음. 크래시 리포터 기록(about:crashes)에 미디어 스레드 크래시가 반복되는지 정도."
+    },
+    "deepDive": null
+  },
+  {
+    "cve": "CVE-2026-130774",
+    "date": "2026-11-19",
+    "grade": "green",
+    "title": "Incus 한 번도 안 띄운 비특권 컨테이너를 rebuild하면 idmap이 사라져 호스트 uid 0으로 부팅",
+    "product": "Incus 7.6.0 미만",
+    "summary": "비특권 컨테이너를 한 번도 시작하지 않은 상태에서 rebuild하면 volatile.idmap.* 키 세 개가 모두 비게 되는데, 시작 코드는 '기존 맵이 있을 때만' 재할당해서 사용자 네임스페이스 없이 부팅됐어. 컨테이너 안 root가 그대로 호스트 uid 0이고 sys_module 같은 권한이 남아 커널 모듈 로드로 호스트를 장악할 수 있어. 널 상태를 '변경 불필요'로 해석한 상태 기계 결함이야.",
+    "cvss": 8.8,
+    "kev": false,
+    "poc": false,
+    "tags": [
+      "incus",
+      "lxc",
+      "user-namespace",
+      "idmap",
+      "privilege-escalation",
+      "container-escape",
+      "cwe-269"
+    ],
+    "links": [
+      {
+        "label": "Incus 보안 권고 GHSA-9c46-v3hw-v6m8",
+        "url": "https://github.com/lxc/incus/security/advisories/GHSA-9c46-v3hw-v6m8"
+      },
+      {
+        "label": "lxc/incus 커밋 e23bcb8",
+        "url": "https://github.com/lxc/incus/commit/e23bcb8b7e1dd223140668a67907b3312c562f42"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-130774"
+      },
+      {
+        "label": "CVE.org",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-130774"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "Incus는 비특권 컨테이너의 uid/gid 매핑을 volatile.idmap.next, volatile.idmap.current, volatile.last_state.idmap 세 키로 관리해. rebuild는 next와 last_state를 지우고, current는 시작할 때만 써져. 그래서 한 번도 안 띄운 컨테이너를 rebuild하면 세 키가 모두 없어. startCommon()의 재할당 조건은 nextMap != nil && !IdmapSet.Includes(nextMap)이라 nextMap이 nil이면 아무것도 안 하고, 맵 없이 시작한 컨테이너는 identity 매핑(사실상 특권 컨테이너)으로 떠. '없음'을 '바꿀 필요 없음'으로 처리한 부정확한 권한 관리(CWE-269)야.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "lxc/incus 커밋 e23bcb8 발췌 (수정 전 driver_lxc.go)",
+          "lang": "go",
+          "code": "// 맵이 있고 허용 범위 밖일 때만 재할당\nif nextMap != nil && d.state.OS.IdmapSet != nil && !d.state.OS.IdmapSet.Includes(nextMap) {\n    // ... 새 idmap 할당\n}\n// nextMap == nil 이면 그냥 진행 -> userns 없이 시작"
+        },
+        {
+          "kind": "fix",
+          "label": "lxc/incus 커밋 e23bcb8 발췌",
+          "lang": "go",
+          "code": "// 맵이 없거나(never-started 후 rebuild) 범위 밖이면 할당\nif d.state.OS.IdmapSet != nil && (nextMap == nil || !d.state.OS.IdmapSet.Includes(nextMap)) {\n    // ... 새 idmap 할당, 저장될 때까지 락 유지\n}"
+        }
+      ],
+      "trigger": "로컬(인스턴스 관리 권한이 있는 인증된 사용자). 비특권 컨테이너를 만들고 시작하지 않은 채 rebuild한 뒤 시작하면 조건이 맞아. restricted 프로젝트 사용자도 컨테이너 생성과 rebuild가 가능하면 해당돼.",
+      "exploitation": "컨테이너 안 root 프로세스가 호스트 uid 0으로 돌고, sys_module 등 capability가 남아 있고 device cgroup 제한도 없어서 커널 모듈 로드나 장치 직접 접근으로 호스트를 장악할 수 있어. 공개 PoC, 악용 보고 없음.",
+      "patch": "7.6.0의 e23bcb8이 시작 시 맵이 없으면 무조건 새로 할당하도록 조건을 바꿨어. 기존에 이 상태로 떠 있는 컨테이너는 업데이트 후 재시작해야 맵이 할당돼(추정). 임시 완화는 restricted 프로젝트 사용자의 rebuild 권한 제한.",
+      "detection": "호스트에서 컨테이너 init 프로세스의 /proc/<pid>/uid_map이 '0 0 4294967295'(identity)인지 확인하면 바로 보여. incus config show로 비특권 컨테이너인데 volatile.idmap.current가 비어 있거나 identity인 인스턴스 점검. 컨테이너 쪽 init_module, finit_module 시스템 콜은 auditd로 잡을 수 있어."
+    },
+    "deepDive": null
+  },
+  {
+    "cve": "CVE-2026-130778",
+    "date": "2026-11-19",
+    "grade": "orange",
+    "title": "Incus mTLS 인증이 체인 전체를 신뢰 저장소와 대조, 공개 인증서를 덧붙이면 아무나 사칭",
+    "product": "Incus 7.6.0 미만",
+    "summary": "Incus HTTPS 리스너는 TLS 핸드셰이크에서 클라이언트 체인의 첫 번째 인증서 개인키 소유만 증명되는데, 인증 코드는 체인 전체를 돌면서 하나라도 신뢰 저장소에 있으면 통과시켰어. 그래서 신뢰된 인증서(서버, 클러스터 멤버 포함)의 공개 인증서를 자기 체인 뒤에 붙이면 그 주체로 인증돼 클러스터 권한까지 얻어. 7.6.0에서 13건 묶음으로 수정됐고 악용, PoC는 확인 못 함.",
+    "cvss": 10.0,
+    "kev": false,
+    "poc": false,
+    "tags": [
+      "incus",
+      "lxc",
+      "mtls",
+      "authentication-bypass",
+      "go",
+      "container",
+      "cwe-287"
+    ],
+    "links": [
+      {
+        "label": "Incus 보안 권고 GHSA-xg75-xf37-cph9",
+        "url": "https://github.com/lxc/incus/security/advisories/GHSA-xg75-xf37-cph9"
+      },
+      {
+        "label": "lxc/incus 커밋 8381e54",
+        "url": "https://github.com/lxc/incus/commit/8381e54c3631c627d7ecdec03945bca14d0bd542"
+      },
+      {
+        "label": "CSA 연구 노트 (LXD, Incus 같은 계열 CVE-2026-112816)",
+        "url": "https://labs.cloudsecurityalliance.org/research/csa-research-note-lxd-microcloud-mtls-impersonation-20261101/"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-130778"
+      },
+      {
+        "label": "CVE.org",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-130778"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "incusd는 리스너를 tls.RequestClientCert로 열어. 이 모드에서 Go TLS는 클라이언트가 보낸 체인을 검증하지 않고, CertificateVerify 서명으로 첫 번째 인증서(PeerCertificates[0])의 개인키 소유만 증명해. 나머지 체인 원소는 공격자가 마음대로 넣을 수 있는 데이터인데, Daemon.Authenticate(), certificateDelete(), doCertificateUpdate(), incus-agent의 authenticate() 등이 for range r.TLS.PeerCertificates로 체인 전체를 돌며 CheckTrustState()에 넣었어. 게다가 certificatesPost()는 신뢰 저장소에 추가할 인증서로 체인의 마지막 원소를 골랐어. '키로 증명된 것'과 '신원으로 쓰는 것'이 어긋난 인증 결함(CWE-287)이야. 11월 초 LXD, MicroCloud에서 나온 CVE-2026-112816과 같은 계열이고, 커밋 메시지상 이 수정은 10월 13일에 들어갔어.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "lxc/incus 커밋 8381e54 발췌 (수정 전 cmd/incusd/daemon.go)",
+          "lang": "go",
+          "code": "// 체인의 모든 인증서를 신뢰 저장소와 대조\nfor _, i := range r.TLS.PeerCertificates {\n    // 덧붙인 공개 인증서도 여기서 매칭됨 (키 소유 증명 없음)\n    trusted, fp := localUtil.CheckTrustState(*i, trustedCerts[certificate.TypeServer], d.endpoints.NetworkCert(), false)\n    if trusted {\n        return true, fp, \"cluster\", nil, nil\n    }\n}"
+        },
+        {
+          "kind": "fix",
+          "label": "lxc/incus 커밋 8381e54 발췌",
+          "lang": "go",
+          "code": "// 키 소유가 증명된 첫 번째 인증서만 신원으로 사용\nvar peerCert *x509.Certificate\nif r.TLS != nil && len(r.TLS.PeerCertificates) > 0 {\n    peerCert = r.TLS.PeerCertificates[0]\n}\nif peerCert != nil {\n    trusted, fp := localUtil.CheckTrustState(*peerCert, trustedCerts[certificate.TypeServer], d.endpoints.NetworkCert(), false)\n    // certificatesPost도 체인 마지막 원소 대신 [0] 사용\n}"
+        }
+      ],
+      "trigger": "원격, 무인증. incusd가 네트워크(core.https_address)에 노출돼 있고, 공격자가 신뢰된 인증서 하나의 공개 인증서를 알면 돼. 서버 인증서는 TLS 핸드셰이크에서 그냥 받을 수 있어서 이 조건은 사실상 항상 충족돼(서버 인증서가 TypeServer 신뢰 항목인 클러스터 구성 기준).",
+      "exploitation": "자기 키로 만든 인증서를 첫 원소로, 서버나 클러스터 멤버의 공개 인증서를 뒤에 붙이면 cluster 신원으로 인증돼 전체 API를 쓰게 돼. 여기서 신뢰 저장소 항목 수정, 스크립틀릿 기반 인가 판단 조작, 인스턴스 생성과 설정 변경을 통한 호스트 장악까지 이어질 수 있어(추정). 공개 PoC, 악용 보고 없음.",
+      "patch": "7.6.0의 커밋 8381e54가 모든 신뢰 저장소 검사(daemon.go, certificates.go, api_vsock.go, incus-agent server.go)를 PeerCertificates[0] 하나로 바꿨어. 메트릭용 CheckTrustStateIssuer처럼 CA 발급 검증을 하는 경로는 체인을 계속 받지만 그쪽은 서명 검증을 해. 임시 완화는 incusd API를 관리망으로만 열기.",
+      "detection": "공개된 탐지 지표 없음. incusd 로그에서 예상 밖 IP의 cluster 또는 서버 신원 인증, 신뢰 저장소 변경 이벤트(certificate-created 등 라이프사이클 이벤트)를 보는 게 현실적. 네트워크 쪽에서는 클라이언트 인증서 체인 길이가 2 이상인 mTLS 접속을 TLS 메타데이터로 볼 수 있으면 지표가 돼."
+    },
+    "deepDive": null
+  },
+  {
+    "cve": "CVE-2026-130786",
+    "date": "2026-11-19",
+    "grade": "green",
+    "title": "Incus OCI 이미지 설정값 줄바꿈으로 LXC 설정 지시어 주입, 호스트 root 훅",
+    "product": "Incus 7.6.0 미만",
+    "summary": "OCI 이미지 config.json의 값이나 oci.entrypoint, oci.cwd 키가 줄 단위인 LXC 설정 파일에 검증 없이 들어가서, 줄바꿈 하나로 lxc.hook 같은 지시어를 추가할 수 있었어. 제한된 프로젝트에서도 조작된 이미지로 인스턴스를 띄우기만 하면 호스트 root 명령 실행이나 호스트 경로 바인드 마운트가 돼. 설정 파일 형식을 모르는 계층이 문자열을 넘기는 고전적인 구분자 주입이야.",
+    "cvss": 9.9,
+    "kev": false,
+    "poc": false,
+    "tags": [
+      "incus",
+      "lxc",
+      "oci",
+      "config-injection",
+      "container-escape",
+      "crlf",
+      "cwe-93"
+    ],
+    "links": [
+      {
+        "label": "Incus 보안 권고 GHSA-3wxw-5gh2-j2x2",
+        "url": "https://github.com/lxc/incus/security/advisories/GHSA-3wxw-5gh2-j2x2"
+      },
+      {
+        "label": "lxc/incus 커밋 e933b9f",
+        "url": "https://github.com/lxc/incus/commit/e933b9f920e16af8932c30d4565e293675828dc1"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-130786"
+      },
+      {
+        "label": "CVE.org",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-130786"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "Incus는 OCI 컨테이너를 liblxc로 띄우면서 이미지 config.json의 Env, 그리고 인스턴스 키 oci.entrypoint, oci.cwd 값을 lxcSetConfigItem()을 통해 liblxc 설정에 넣어. liblxc 설정 파일은 key = value 줄 단위 형식인데, Incus는 값에 CR, LF가 있는지 보지 않았고 oci.entrypoint 검증기는 validate.IsAny였어. 그래서 값 안의 줄바꿈 뒤 문자열이 별도 지시어로 해석돼. 신뢰할 수 없는 이미지 데이터가 특권 구성 파일의 문법 경계를 넘는 구분자 주입(CWE-93 계열)이야.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "lxc/incus 커밋 e933b9f 발췌 (수정 전)",
+          "lang": "go",
+          "code": "// oci.entrypoint: 어떤 문자열이든 허용\n\"oci.entrypoint\": validate.IsAny,\n\nfunc lxcSetConfigItem(c *liblxc.Container, key, value string) error {\n    // value에 줄바꿈이 있어도 그대로 줄 단위 설정에 기록됨\n    err := c.SetConfigItem(key, value)"
+        },
+        {
+          "kind": "fix",
+          "label": "lxc/incus 커밋 e933b9f 발췌",
+          "lang": "go",
+          "code": "// 설정 파일은 줄 단위라 줄바꿈이 있으면 지시어 주입이 됨\nif strings.ContainsAny(key, \"\\r\\n\") || strings.ContainsAny(value, \"\\r\\n\") {\n    return fmt.Errorf(\"Failed to set LXC config: %s: Key and value cannot contain line breaks\", key)\n}\n\"oci.entrypoint\": isOCIConfigValue,  // 키 검증기에서도 거부\n\"oci.cwd\": validate.Optional(validate.IsAbsFilePath, isOCIConfigValue),"
+        }
+      ],
+      "trigger": "인증된 사용자. 공격자가 통제하는 OCI 이미지로 인스턴스를 만들 수 있거나 oci.* 키를 설정할 수 있으면 돼. restricted 프로젝트 사용자도 해당돼서 멀티테넌트 Incus에서 의미가 커.",
+      "exploitation": "주입한 지시어로 liblxc 훅(호스트에서 root로 실행)을 등록하거나 lxc.mount.entry로 호스트 경로를 컨테이너에 마운트해서 호스트 root 권한까지 가. 공개 PoC, 악용 보고 없음.",
+      "patch": "7.6.0의 e933b9f가 lxcSetConfigItem() 공통 setter, OCI 환경 변수 파서, oci.entrypoint와 oci.cwd 키 검증기 세 곳에서 CR, LF를 거부해. 공통 setter에서 막았기 때문에 다른 키 경로로 같은 주입이 들어와도 걸러져서 완결성이 좋은 편이야. 임시 완화는 신뢰할 수 있는 레지스트리 이미지만 허용.",
+      "detection": "공개된 지표 없음. 호스트의 인스턴스별 lxc.conf(Incus 로그 디렉터리의 생성된 설정)에서 예상 밖 lxc.hook.* 또는 lxc.mount.entry 줄, incusd나 lxc-start 아래로 실행된 예상 밖 훅 프로세스를 auditd execve로 확인."
+    },
+    "deepDive": null
+  },
+  {
+    "cve": "CVE-2026-131054",
+    "date": "2026-11-19",
+    "grade": "orange",
+    "title": "Chrome 158 대량 패치 204건, ANGLE 경계 밖 쓰기 등 Critical 6건",
+    "product": "Google Chrome 158.0.8127.36 미만 (Edge 등 Chromium 기반 포함)",
+    "summary": "Chrome 158 안정판이 보안 수정 204건을 냈고, 그중 Critical이 6건(ANGLE OOB 쓰기, GPU OOB 쓰기, WebAudio UAF, GarbageCollection UAF, Media 버퍼 오버플로, Android WebView UAF)이야. 대표로 고른 CVE-2026-131054는 ANGLE의 경계 밖 쓰기로, 조작된 HTML 페이지만으로 샌드박스 밖 코드 실행이 가능하다고 기술돼 있어. 이번 묶음에서 실제 악용 표시는 없고 세부 버그는 비공개야.",
+    "cvss": 9.6,
+    "kev": false,
+    "poc": false,
+    "tags": [
+      "chrome",
+      "chromium",
+      "angle",
+      "gpu",
+      "oob-write",
+      "use-after-free",
+      "browser",
+      "cwe-787"
+    ],
+    "links": [
+      {
+        "label": "Chrome Releases 안정 채널 업데이트",
+        "url": "https://chromereleases.googleblog.com/2026/11/stable-channel-update-for-desktop_01699533288.html"
+      },
+      {
+        "label": "Chromium 이슈 576812570",
+        "url": "https://issues.chromium.org/issues/576812570"
+      },
+      {
+        "label": "HKCERT 권고",
+        "url": "https://www.hkcert.org/security-bulletin/google-chrome-multiple-vulnerabilities_20261118"
+      },
+      {
+        "label": "SecurityOnline 정리",
+        "url": "https://securityonline.info/chrome-158-fixes-204-flaws-cve-2026-130963/"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-131054"
+      },
+      {
+        "label": "CVE.org",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-131054"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "CVE-2026-131054는 ANGLE(OpenGL ES를 D3D11, Vulkan 등으로 옮기는 변환 계층)의 경계 밖 쓰기(CWE-787)라고만 공개됐어. ANGLE은 GPU 프로세스에서 돌기 때문에 렌더러 샌드박스 밖이라는 점이 'outside the sandbox' 기술의 이유야. 어떤 버퍼, 어떤 크기 계산이 틀렸는지는 버그가 비공개라 공개된 세부 없음. 같은 릴리스의 다른 Critical은 CVE-2026-131031(GPU OOB 쓰기), CVE-2026-130975(WebAudio UAF), CVE-2026-131008(GarbageCollection UAF), CVE-2026-131060(Media 버퍼 오버플로), CVE-2026-130963(Android WebView UAF)이야.",
+      "trigger": "원격, 사용자 상호작용 필요(조작된 웹페이지 방문, CVSS UI:R). 추가 권한이나 설정은 필요 없어.",
+      "exploitation": "WebGL 등으로 ANGLE에 조작된 입력을 넘겨 GPU 프로세스 메모리 손상을 일으키고, 그게 GPU 프로세스 안 코드 실행으로 이어질 수 있다는 게 공식 기술이야. 렌더러 RCE 없이 바로 GPU 프로세스로 가는 경로라 체인 길이가 짧은 편이야(추정). 공개 PoC, 악용 보고 없음.",
+      "patch": "Chrome 158.0.8127.36(Windows, Mac, Linux)에서 수정. Edge, Whale 등 Chromium 기반 브라우저는 각 벤더의 158 기반 업데이트를 따로 확인해야 해. 이번 릴리스는 XSLT 지원 제거도 포함됐어.",
+      "detection": "공개된 지표 없음. 운영 측면에서는 학교 PC의 chrome.exe 버전을 158.0.8127.36 이상으로 확인하는 게 실질적. Windows에서는 GPU 프로세스(chrome.exe --type=gpu-process)가 예상 밖 자식 프로세스를 만드는지 Sysmon 이벤트 1로 볼 수 있고, 크래시는 Crashpad 덤프로 남아."
     },
     "deepDive": null
   },
