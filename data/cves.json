@@ -1,5 +1,83 @@
 [
   {
+    "cve": "CVE-2024-10441",
+    "date": "2026-11-20",
+    "grade": "red",
+    "title": "Synology DSM synoplugind 출력 인코딩 결함 사전 인증 RCE",
+    "product": "Synology DSM 7.2-64570-4, 7.2.1-69057-6, 7.2.2-72806-1 미만, BeeStation OS 1.1-65374 미만",
+    "summary": "DSM과 BeeStation의 시스템 플러그인 데몬(synoplugind)에서 출력 인코딩/이스케이프 누락으로 원격 무인증 코드 실행이 가능한 2024년 Pwn2Own 계열 버그다. 11월 18일 CISA KEV에 등재(포렌식 트리아지 요구 대상), 업데이트 안 한 NAS를 노리는 C3RB3R 랜섬웨어 공격 보도가 함께 나왔다. 공개 PoC 저장소가 여러 개 있다.",
+    "cvss": 9.8,
+    "kev": true,
+    "poc": true,
+    "tags": [
+      "synology",
+      "nas",
+      "dsm",
+      "beestation",
+      "pre-auth-rce",
+      "ransomware",
+      "kev",
+      "cwe-116"
+    ],
+    "links": [
+      {
+        "label": "Synology-SA-24:20 DSM",
+        "url": "https://www.synology.com/en-global/security/advisory/Synology_SA_24_20"
+      },
+      {
+        "label": "Synology-SA-24:23 BeeStation",
+        "url": "https://www.synology.com/en-global/security/advisory/Synology_SA_24_23"
+      },
+      {
+        "label": "CISA KEV 카탈로그",
+        "url": "https://www.cisa.gov/known-exploited-vulnerabilities-catalog"
+      },
+      {
+        "label": "HKCERT 공지",
+        "url": "https://www.hkcert.org/security-bulletin/synology-diskstation-manager-remote-code-execution-vulnerability_20261119"
+      },
+      {
+        "label": "BreachNews C3RB3R 공격 보도",
+        "url": "https://breachnews.com/ransomware/synology-warns-of-c3rb3r-ransomware-attacks-on-outdated-nas-devices/"
+      },
+      {
+        "label": "공개 PoC 저장소",
+        "url": "https://github.com/hazzzein/CVE-2024-10441"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2024-10441"
+      },
+      {
+        "label": "CVE.org",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2024-10441"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "벤더 권고와 CVE 레코드는 '시스템 플러그인 데몬의 출력 인코딩 또는 이스케이프 부적절(CWE-116), 미상 벡터로 원격 코드 실행'까지만 밝힌다. 제3자 PoC 저장소 설명에 따르면 대상 컴포넌트는 synoplugind이고 root 권한 사전 인증 RCE다. 데몬이 외부 입력을 다른 해석기(명령, 설정, 직렬화 포맷 등)에 넘길 때 구분자를 이스케이프하지 않아 데이터가 구조로 해석되는 유형으로 보이나 어떤 해석기인지는 공개 자료로 확인 못 함(추정).",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "재구성, 실제 소스 아님 (CWE-116 일반 패턴, 추정)",
+          "lang": "c",
+          "code": "// 외부 값을 다른 해석기용 문자열에 그대로 이어 붙임\nsnprintf(buf, sizeof(buf), \"key=%s\\n\", user_value); // 구분자(줄바꿈 등) 미이스케이프\nwrite_to_consumer(buf);  // 소비 측은 root 권한으로 해석"
+        },
+        {
+          "kind": "fix",
+          "label": "재구성, 실제 소스 아님 (수정 방향 추정)",
+          "lang": "c",
+          "code": "if (!is_valid_token(user_value)) return -EINVAL; // 허용 문자 집합 검증\nescaped = escape_for_consumer(user_value);        // 소비 측 문법에 맞춘 인코딩\nsnprintf(buf, sizeof(buf), \"key=%s\\n\", escaped);"
+        }
+      ],
+      "trigger": "원격, 무인증. DSM 웹 서비스(기본 5000/5001)나 관련 포트에 도달 가능해야 한다. QuickConnect, 포트포워딩으로 인터넷에 노출된 구버전 NAS가 주 대상.",
+      "exploitation": "root 권한 코드 실행으로 이어지고, 보도된 캠페인에서는 공유 폴더 암호화(C3RB3R)로 끝난다. 세부 체인은 다루지 않는다.",
+      "patch": "DSM 7.2-64570-4, 7.2.1-69057-6, 7.2.2-72806-1 이상, BeeStation 1.1-65374 이상. 2024년 말 배포된 패치라 자동 업데이트를 켜둔 장비는 이미 안전하다. 남은 위험은 업데이트를 끈 장비와 지원 종료 모델. 임시 완화는 외부 노출 차단과 방화벽 지역 제한.",
+      "detection": "CISA가 포렌식 트리아지를 요구한 항목이다. DSM 로그 센터에서 synoplugind 관련 비정상 오류, /var/log 아래 웹 서버 로그의 플러그인 관련 이상 요청, 예상 밖 cron 작업과 신규 계정, 공유 폴더 내 대량 확장자 변경과 랜섬 노트 파일."
+    },
+    "deepDive": null
+  },
+  {
     "cve": "CVE-2024-27834",
     "date": "2026-11-06",
     "grade": "red",
@@ -1202,6 +1280,131 @@
           "code": "__ BIND(L_finalBit);\n// Now have 1 to 63 bytes left to decode\n\n+// A padded Base64 tail shorter than one complete block is handled by Java.\n+__ cmpl(length, 4);                  // 4바이트 미만이면\n+__ jcc(Assembler::less, L_bruteForce); // 마스크 경로 대신 스칼라 폴백"
         }
       ]
+    },
+    "deepDive": null
+  },
+  {
+    "cve": "CVE-2026-115342",
+    "date": "2026-11-20",
+    "grade": "green",
+    "title": "OpenVPN 대화형 서비스 명령줄 파서 불일치로 옵션 검증 우회",
+    "product": "OpenVPN 2.4.0 ~ 2.6.23, 2.7_alpha1 ~ 2.7.8 (Windows, 2.7.9에서 수정)",
+    "summary": "Windows용 OpenVPN 대화형 서비스(openvpnserv)는 사용자가 넘긴 명령줄을 CommandLineToArgvW로 쪼개 허용 옵션과 설정 파일 위치를 검증하지만, openvpn.exe는 CRT가 쪼갠 argv를 쓴다. 두 파서가 인용 문자열 안의 연속 큰따옴표를 다르게 해석해, 검증기에는 문자열 하나로 보이는 부분이 실제 프로세스에서는 별도 옵션이 된다. 일반 사용자가 신뢰된 설정 디렉터리 밖의 설정을 서비스 권한으로 실행시키는 로컬 권한 상승 경로.",
+    "cvss": 8.5,
+    "kev": false,
+    "poc": false,
+    "tags": [
+      "openvpn",
+      "windows",
+      "lpe",
+      "parser-differential",
+      "argument-injection",
+      "commandlinetoargvw",
+      "cwe-88"
+    ],
+    "links": [
+      {
+        "label": "OpenVPN 보안 공지 CVE-2026-115342",
+        "url": "https://community.openvpn.net/Security%20Announcements/CVE-2026-115342"
+      },
+      {
+        "label": "OpenVPN/openvpn 수정 커밋 6e2038b (release/2.7)",
+        "url": "https://github.com/OpenVPN/openvpn/commit/6e2038b5b09ba4e7e50916ed4e5143d9afeff3bc"
+      },
+      {
+        "label": "OpenVPN 2.7.9 릴리스 보도",
+        "url": "https://www.linuxcompatible.org/story/openvpn-279-released-mainly-with-windows-security-fixes/"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-115342"
+      },
+      {
+        "label": "CVE.org",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-115342"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "Windows에는 명령줄을 argv로 쪼개는 '표준'이 하나가 아니다. shell32의 CommandLineToArgvW와 MSVC CRT의 시작 코드(wmain에 넘기는 wargv)는 VS2008 이후 인용 구간 안의 연속된 큰따옴표 두 개를 다르게 처리한다. openvpnserv(SYSTEM 서비스)는 named pipe로 받은 명령줄을 CommandLineToArgvW로 해석해 --config가 잠긴 설정 디렉터리 안을 가리키는지, 허용된 옵션만 있는지 검사한 뒤 openvpn.exe를 띄운다. 그런데 openvpn.exe의 wmain은 CRT가 만든 wargv를 그대로 썼다. 검증한 값과 사용하는 값이 서로 다른 파서를 거치는 파서 불일치(parser differential)이고, CWE-179(검증 순서 오류)와 CWE-115(입력 오해석)가 같이 붙은 이유다.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "OpenVPN/openvpn 커밋 6e2038b 이전 src/openvpn/openvpn.c 발췌",
+          "lang": "c",
+          "code": "int wmain(int argc, wchar_t *wargv[])\n{\n    /* CRT가 쪼갠 wargv 사용: 서비스 검증기(CommandLineToArgvW)와 규칙이 다름 */\n    if ((argv = calloc(argc + 1, sizeof(char *))) == NULL)\n        return 1;\n    for (i = 0; i < argc; i++) { /* UTF-8 변환 */ }\n    ret = openvpn_main(argc, argv);"
+        },
+        {
+          "kind": "fix",
+          "label": "OpenVPN/openvpn 커밋 6e2038b 발췌",
+          "lang": "c",
+          "code": "/* 서비스가 검증할 때 쓴 것과 같은 파서로 다시 쪼갬 */\nwargv = CommandLineToArgvW(GetCommandLineW(), &argc);\nif (wargv == NULL)\n    return 1;\n...\nLocalFree(wargv);\nret = openvpn_main(argc, argv);"
+        }
+      ],
+      "trigger": "로컬, 인증된 일반 사용자. OpenVPN 대화형 서비스(OpenVPNServiceInteractive)가 설치되고 실행 중이어야 한다(OpenVPN GUI 설치 시 기본). 사용자는 named pipe로 서비스에 시작 요청을 보낼 수 있다.",
+      "exploitation": "검증을 통과한 명령줄 안에 숨긴 옵션이 openvpn.exe에서 살아나, 잠긴 설정 디렉터리 밖의 설정 파일을 지정할 수 있다. OpenVPN 설정은 스크립트 훅 등 외부 프로그램 실행 지시를 가질 수 있어, 서비스가 띄운 openvpn.exe 권한으로 사용자 제어 동작이 수행된다. 2.7.9는 openvpn.exe를 high integrity로 실행하는 변경도 함께 넣어 영향이 관리자 수준이었음을 시사한다(추정).",
+      "patch": "2.7.9(2.6 계열은 2.6.24 예정, GitHub 태그는 아직 확인 못 함). 커밋 6e2038b가 openvpn.exe의 argv를 CommandLineToArgvW로 통일했고, 같은 릴리스에 66faaa7(서비스가 openvpn 실행 명령줄 재검증), f81b43f(사용자 환경 변수 미전달), d837507(high integrity 실행) 등 서비스 경계 강화가 묶였다. 파서를 하나로 맞춘 게 근본 수정이라 완결성은 좋은 편.",
+      "detection": "Sysmon EID 1이나 Security 4688에서 부모가 openvpnserv.exe인 openvpn.exe의 CommandLine에 config 디렉터리 밖 경로 또는 인용 부호가 연속된 비정상 인자, openvpn.exe의 예상 밖 자식 프로세스(cmd, powershell). ETW로는 Microsoft-Windows-Kernel-Process 프로바이더의 ProcessStart 이벤트(ID 1) CommandLine 필드로 같은 관찰이 가능."
+    },
+    "deepDive": null
+  },
+  {
+    "cve": "CVE-2026-115560",
+    "date": "2026-11-20",
+    "grade": "orange",
+    "title": "PHP 세션 업로드 진행률과 직렬화기 불일치로 객체 주입",
+    "product": "PHP 8.2.36, 8.3.37, 8.4.28, 8.5.13 미만",
+    "summary": "session.upload_progress가 켜져 있으면 공격자가 멀티파트 업로드만으로 세션 키에 원하는 바이트를 넣을 수 있다. 같은 세션을 다른 serialize_handler(php)로 읽게 되면 키 안의 바이트가 unserialize 경로로 들어가 객체 주입이 된다. 같은 릴리스에 세션 파일 부분 덮어쓰기(CVE-2026-126714), FPM 요청 스머글링, 여러 UAF가 함께 묶였다.",
+    "cvss": 9.2,
+    "kev": false,
+    "poc": false,
+    "tags": [
+      "php",
+      "session",
+      "deserialization",
+      "upload-progress",
+      "object-injection",
+      "cwe-502"
+    ],
+    "links": [
+      {
+        "label": "php-src 보안 권고 GHSA-658j-r8rw-q6mx",
+        "url": "https://github.com/php/php-src/security/advisories/GHSA-658j-r8rw-q6mx"
+      },
+      {
+        "label": "php-src 수정 커밋 3f70f66",
+        "url": "https://github.com/php/php-src/commit/3f70f66611583bca4ec18385f7f407e2808fa61f"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-115560"
+      },
+      {
+        "label": "CVE.org",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-115560"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "ext/session의 RFC1867 업로드 진행률 기능은 업로드 중 세션에 upload_progress_<이름> 키로 진행 상태를 기록하는데, 이 키 이름 일부가 요청 필드에서 온다. php_binary나 php_serialize 직렬화기로 쓰인 키는 그 포맷 안에서는 안전하지만, 같은 세션 데이터를 php 직렬화기(키|값 형식)로 읽으면 키 안의 구분자 바이트가 구조로 해석된다. 즉 '세션을 쓰고 읽는 쪽의 직렬화기는 같다'는 불변식을 런타임 ini_set이나 세션 저장소 공유가 깨뜨린다. 여기에 upload_progress.enabled 기본값이 On이라 공격면이 기본으로 열려 있었다. CWE-502, CWE-20.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "php/php-src 커밋 3f70f66 이전 ext/session/session.c 발췌",
+          "lang": "c",
+          "code": "STD_PHP_INI_BOOLEAN(\"session.upload_progress.enabled\",\n    \"1\",  /* 기본 On: 무인증 멀티파트로 세션 키 작성 가능 */\n    ZEND_INI_PERDIR, OnUpdateBool, rfc1867_enabled, ...)\n\nstatic PHP_INI_MH(OnUpdateSerializer) {\n    SESSION_CHECK_ACTIVE_STATE;   /* 런타임 직렬화기 변경 허용 */"
+        },
+        {
+          "kind": "fix",
+          "label": "php/php-src 커밋 3f70f66 발췌",
+          "lang": "c",
+          "code": "#define SESSION_CHECK_UPLOAD_PROGRESS_STATE \\\n  if (PS(rfc1867_enabled) && stage == ZEND_INI_STAGE_RUNTIME) { \\\n    zend_throw_error(NULL, \"...cannot be changed at runtime...\"); \\\n    return FAILURE; }\n/* OnUpdateSerializer, SaveHandler, SaveDir, Name 등에 추가 */\n-    \"1\", ZEND_INI_PERDIR, ... rfc1867_enabled\n+    \"0\", ZEND_INI_PERDIR, ... rfc1867_enabled  /* 기본 Off */"
+        }
+      ],
+      "trigger": "원격, 무인증 멀티파트 업로드. 단 (1) upload_progress 활성(패치 전 기본값), (2) 세션 직렬화기가 런타임에 바뀌거나 직렬화기 설정이 다른 앱끼리 세션 저장소를 공유, (3) 읽는 앱에 쓸 만한 가젯 체인이 있어야 한다. CVSS AC:H, AT:P가 이 조건들을 반영.",
+      "exploitation": "unserialize 객체 주입 프리미티브. 앱 코드나 프레임워크에 __wakeup, __destruct 가젯 체인이 있으면 코드 실행, 없으면 세션 손상이나 DoS로 끝난다.",
+      "patch": "8.2.36, 8.3.37, 8.4.28, 8.5.13. 업로드 진행률 기본값을 Off로 바꾸고, 켜져 있으면 세션 관련 ini의 런타임 변경을 예외로 막는다. 기존 php.ini에서 명시적으로 On을 쓰면 여전히 켜져 있으니 확인 필요. 임시 완화: session.upload_progress.enabled=0.",
+      "detection": "php.ini, .user.ini에서 upload_progress.enabled와 serialize_handler 설정 확인, 앱 코드의 ini_set('session.serialize_handler') 검색, 세션 저장 디렉터리에서 O: 객체 표기가 들어간 비정상 세션 파일."
     },
     "deepDive": null
   },
@@ -2617,6 +2820,49 @@
     "deepDive": null
   },
   {
+    "cve": "CVE-2026-123890",
+    "date": "2026-11-20",
+    "grade": "orange",
+    "title": "vCenter VMware Directory Service 인증 우회",
+    "product": "VMware vCenter 9.1.x, 9.0.x, 8.0 (U3m 미만), 5.x (VCF), Telco Cloud Platform",
+    "summary": "vCenter에 내장된 VMware Directory Service(vmdir, LDAP 기반 SSO 디렉터리)에서 대체 경로를 통한 인증 우회가 있다. 무인증 원격, CVSS 9.8. 현재 악용 보고는 없지만 vCenter는 과거 KEV 단골이라 우선 패치 대상이다.",
+    "cvss": 9.8,
+    "kev": false,
+    "poc": false,
+    "tags": [
+      "vmware",
+      "vcenter",
+      "vmdir",
+      "ldap",
+      "sso",
+      "auth-bypass",
+      "cwe-288"
+    ],
+    "links": [
+      {
+        "label": "Broadcom 보안 권고 39495",
+        "url": "https://support.broadcom.com/web/ecx/support-content-notification/-/external/content/SecurityAdvisories/0/39495"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-123890"
+      },
+      {
+        "label": "CVE.org",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-123890"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "벤더는 'VMware Directory Service의 인증 우회, CWE-288(대체 경로나 채널을 통한 인증 우회)'만 밝혔다. vmdir은 vCenter SSO의 사용자, 그룹, 서비스 계정을 담는 LDAP 디렉터리라 이 계층의 인증 우회는 SSO 관리자 권한 획득과 사실상 같다(추정). 어떤 LDAP 연산이나 바인드 경로가 문제인지는 공개 자료로 확인 못 함.",
+      "trigger": "원격, 무인증. vmdir 서비스 포트(LDAP 389/636 등)에 네트워크로 도달 가능해야 한다(추정). 관리망 분리가 안 된 환경이 위험.",
+      "exploitation": "공개된 세부 없음. 디렉터리 쓰기가 가능하면 SSO 관리자 계정 생성이나 그룹 변경으로 vCenter 전체와 하위 ESXi 장악으로 이어질 수 있다(추정).",
+      "patch": "vCenter 9.1.1.0200, 9.0.2.0200, 8.0 U3m, VCF 5.2.5. Telco Cloud는 KB463116 참고. 임시 완화책 공개 여부는 확인 못 함.",
+      "detection": "vmdir 감사 로그(/var/log/vmware/vmdird/)에서 비정상 바인드, 새 계정이나 SSO 그룹(Administrators) 멤버십 변경, 관리망 외부에서 vCenter 389/636 포트로의 연결."
+    },
+    "deepDive": null
+  },
+  {
     "cve": "CVE-2026-124019",
     "date": "2026-11-17",
     "grade": "green",
@@ -3362,6 +3608,66 @@
       "patch": "Microsoft 365 Apps는 최신 채널 빌드, LTSC 2021은 16.0.14334.21048, LTSC 2024는 16.0.17932.21140, Mac은 16.115.26110837 이상. 무엇이 바뀌었는지는 공개 안 됨. 레코드 예약은 11/10, 공개는 11/16이라 정기 패치 후 추가 공개된 건으로 보여(추정).",
       "detection": "공개된 전용 지표 없음. 일반적으로 ONENOTE.EXE가 cmd.exe, powershell.exe, mshta.exe 같은 자식 프로세스를 띄우는지 Sysmon 이벤트 1이나 EDR 프로세스 트리로 보는 게 기본. 메일 게이트웨이에서 .one 첨부를 차단 또는 격리하는 것도 오래된 OneNote 피싱 대응과 같아.",
       "code": []
+    },
+    "deepDive": null
+  },
+  {
+    "cve": "CVE-2026-126714",
+    "date": "2026-11-20",
+    "grade": "green",
+    "title": "PHP files 세션 핸들러 부분 덮어쓰기로 이전 세션 꼬리 잔존",
+    "product": "PHP 8.2.36, 8.3.37, 8.4.28, 8.5.13 미만 (기본 files 세션 핸들러)",
+    "summary": "files 세션 핸들러는 새 데이터가 기존보다 짧을 때만 파일을 truncate했고, 그마저 실패를 무시했다. 쓰기가 중간에 끊기면 새 세션 앞부분과 옛 세션 꼬리가 이어 붙어, 일반 문자열이었던 바이트가 unserialize에서 객체로 해석될 수 있다. 조건이 까다롭지만 파일 쓰기 원자성이라는 고전적 버그 클래스의 좋은 사례다.",
+    "cvss": 9.2,
+    "kev": false,
+    "poc": false,
+    "tags": [
+      "php",
+      "session",
+      "race-condition",
+      "toctou",
+      "deserialization",
+      "cwe-367"
+    ],
+    "links": [
+      {
+        "label": "php-src 보안 권고 GHSA-fm2m-fjf5-v3cp",
+        "url": "https://github.com/php/php-src/security/advisories/GHSA-fm2m-fjf5-v3cp"
+      },
+      {
+        "label": "php-src 수정 커밋 41c0941",
+        "url": "https://github.com/php/php-src/commit/41c0941ae27d1033129e0e09ce3af034ffee86ba"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-126714"
+      },
+      {
+        "label": "CVE.org",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-126714"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "ext/session/mod_files.c의 ps_files_write는 기존 세션 파일을 열어 둔 fd에 새 직렬화 데이터를 pwrite로 0 오프셋부터 덮어쓴다. 길이가 줄어드는 경우에만 ftruncate(fd, 0)을 먼저 했고, 반환값도 php_ignore_value로 버렸다. 그래서 쓰기가 도중에 중단(프로세스 _exit, 스레드 환경에서 다른 스레드가 종료 유발 등)되면 파일은 '새 데이터 접두부 + 옛 데이터 접미부'가 된다. 직렬화 포맷의 길이 접두 문자열 경계가 어긋나면서 원래 값 내부 바이트가 구조로 읽힌다. 불변식 '세션 파일은 항상 한 번의 완전한 직렬화 결과'가 원자적 쓰기 부재로 깨진 TOCTOU/동기화 결함(CWE-367, CWE-662).",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "php/php-src 커밋 41c0941 이전 mod_files.c 발췌",
+          "lang": "c",
+          "code": "/* Truncate file if the amount of new data is smaller than the existing data set. */\nif (ZSTR_LEN(val) < data->st_size) {\n    php_ignore_value(ftruncate(data->fd, 0)); /* 조건부, 실패 무시 */\n}\n/* 이후 pwrite(fd, val, len, 0) 중단 시 옛 꼬리 잔존 */"
+        },
+        {
+          "kind": "fix",
+          "label": "php/php-src 커밋 41c0941 발췌",
+          "lang": "c",
+          "code": "if (ftruncate(data->fd, 0) != 0) {   /* 항상 먼저 비우고 */\n    php_error_docref(NULL, E_WARNING, \"ftruncate() failed: %s (%d)\",\n                     strerror(errno), errno);\n    return FAILURE;                   /* 실패하면 쓰지 않음 */\n}"
+        }
+      ],
+      "trigger": "원격, 무인증이지만 공격자가 (1) 세션 데이터 내용에 영향을 줄 수 있고(업로드 진행률 등), (2) 쓰기 중단 시점을 어느 정도 조절할 수 있어야 한다. 커밋 메시지는 스레드 환경(ZTS)에서 다른 스레드가 프로세스 종료를 유발하는 경우를 든다.",
+      "exploitation": "성공하면 CVE-2026-115560과 같은 unserialize 객체 주입 프리미티브. 가젯 체인 유무에 따라 코드 실행 또는 세션 손상.",
+      "patch": "항상 ftruncate(fd, 0) 후 쓰기, 실패 시 FAILURE 반환. 다만 truncate와 write 사이에 중단되면 빈 파일이 남는 것이라 '손상' 대신 '세션 소실'로 바뀐 것이고, 진짜 원자성(임시 파일 후 rename)은 아니다. 객체 주입 관점에서는 충분한 수정.",
+      "detection": "세션 디렉터리(session.save_path)에 직렬화 문법이 깨진 파일, PHP 로그의 session_decode 실패 경고, 새로 추가된 'ftruncate() failed' 경고."
     },
     "deepDive": null
   },
@@ -4443,6 +4749,62 @@
     "deepDive": null
   },
   {
+    "cve": "CVE-2026-133323",
+    "date": "2026-11-20",
+    "grade": "orange",
+    "title": "Mitel MiCollab AWV 무인증 블라인드 명령 주입",
+    "product": "Mitel MiCollab 10.3 (10.3.0.18) 이하",
+    "summary": "MiCollab의 오디오, 웹, 영상 회의(AWV) 컴포넌트에서 파라미터 검증 부족으로 무인증 블라인드 OS 명령 주입이 된다(CVSS 10.0). MiCollab은 2024년 AWV 관련 버그 두 건이 KEV에 오른 전례가 있어 이번 것도 노출 장비는 빨리 패치해야 한다.",
+    "cvss": 10.0,
+    "kev": false,
+    "poc": false,
+    "tags": [
+      "mitel",
+      "micollab",
+      "uc",
+      "command-injection",
+      "pre-auth",
+      "cwe-78"
+    ],
+    "links": [
+      {
+        "label": "Mitel 권고 MISA-2026-0012",
+        "url": "https://www.mitel.com/support/security-advisories/mitel-product-security-advisory-misa-2026-0012"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-133323"
+      },
+      {
+        "label": "CVE.org",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-133323"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "AWV 컴포넌트가 요청 파라미터를 OS 명령 문자열에 넣기 전에 셸 메타문자를 충분히 걸러내지 않는다(CWE-78). '블라인드'라는 표현은 명령 출력이 응답에 돌아오지 않는다는 뜻. 어느 엔드포인트, 어느 파라미터인지는 공개 자료로 확인 못 함(MTLVULN-1864).",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "재구성, 실제 소스 아님 (CWE-78 일반 패턴)",
+          "lang": "java",
+          "code": "String id = req.getParameter(\"conf\");\n// 셸을 거쳐 문자열 결합으로 실행\nRuntime.getRuntime().exec(new String[]{\"/bin/sh\", \"-c\", \"tool --conf \" + id});"
+        },
+        {
+          "kind": "fix",
+          "label": "재구성, 실제 소스 아님",
+          "lang": "java",
+          "code": "if (!id.matches(\"[A-Za-z0-9_-]{1,64}\")) throw new BadRequest();\n// 셸 없이 인자 배열로 실행\nnew ProcessBuilder(\"tool\", \"--conf\", id).start();"
+        }
+      ],
+      "trigger": "원격, 무인증. 인터넷에 노출된 MiCollab 웹 인터페이스(AWV는 외부 회의 참가용이라 노출이 흔함).",
+      "exploitation": "MiCollab 서버 시스템 컨텍스트의 명령 실행. 이후 통신 기록과 내부망 피벗.",
+      "patch": "MISA-2026-0012의 수정 버전 적용. 정확한 빌드 번호는 이번 조사에서 확인 못 함.",
+      "detection": "AWV 웹 로그에서 파라미터에 셸 메타문자가 들어간 요청, 웹 프로세스의 sh, curl, wget 자식 프로세스, MiCollab 서버의 예상 밖 아웃바운드 연결."
+    },
+    "deepDive": null
+  },
+  {
     "cve": "CVE-2026-13684",
     "date": "2026-11-05",
     "grade": "red",
@@ -4630,6 +4992,79 @@
     "deepDive": null
   },
   {
+    "cve": "CVE-2026-40217",
+    "date": "2026-11-20",
+    "grade": "red",
+    "title": "LiteLLM 커스텀 코드 가드레일 샌드박스 탈출 (바이트코드 교체)",
+    "product": "BerriAI LiteLLM 프록시 (2026-04-08 이전 커스텀 코드 가드레일 구현)",
+    "summary": "LiteLLM 프록시의 /guardrails/test_custom_code 엔드포인트는 사용자가 넣은 파이썬 가드레일 코드를 '샌드박스'에서 실행하는데, 함수 객체의 바이트코드를 바꿔치기해 제공된 프리미티브(http_get 등)의 실제 builtins에 닿는 방식으로 탈출이 가능했다. 프록시는 LLM 공급자 API 키를 모아 들고 있어 장악 시 피해가 크다. 4월 공개된 버그지만 11월 18일 CISA KEV에 새로 등재됐다.",
+    "cvss": 8.8,
+    "kev": true,
+    "poc": true,
+    "tags": [
+      "litellm",
+      "ai-gateway",
+      "python",
+      "sandbox-escape",
+      "restrictedpython",
+      "kev",
+      "cwe-420"
+    ],
+    "links": [
+      {
+        "label": "X41 D-Sec 권고 X41-2026-001",
+        "url": "https://www.x41-dsec.de/lab/advisories/x41-2026-001-litellm/"
+      },
+      {
+        "label": "GitHub 보안 권고 GHSA-wxxx-gvqv-xp7p",
+        "url": "https://github.com/BerriAI/litellm/security/advisories/GHSA-wxxx-gvqv-xp7p"
+      },
+      {
+        "label": "CISA KEV 카탈로그",
+        "url": "https://www.cisa.gov/known-exploited-vulnerabilities-catalog"
+      },
+      {
+        "label": "GitLab 권고 DB",
+        "url": "https://advisories.gitlab.com/pypi/litellm/CVE-2026-40217/"
+      },
+      {
+        "label": "공개 PoC 저장소",
+        "url": "https://github.com/learner202649/CVE-2026-40217-PoC"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-40217"
+      },
+      {
+        "label": "CVE.org",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-40217"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "커스텀 코드 가드레일은 관리자가 등록한 파이썬 소스를 프록시 프로세스 안에서 실행한다. 취약 구현은 별도 프로세스 격리 없이 '제한된 전역 dict + 이름 차단' 수준이어서, 파이썬 객체 모델(함수의 코드 객체, 프레임, globals)을 통한 접근을 막지 못했다. 현재 리포지토리의 보안 테스트 주석은 공격 기법을 '함수의 바이트코드를 바꿔 http_get의 실제 builtins dict를 읽는 것'으로 설명한다. 즉 샌드박스가 노출한 프리미티브 함수가 원래 모듈의 __globals__와 __builtins__를 그대로 들고 있었고, 이게 감시되지 않는 대체 경로가 됐다. CWE-420(보호되지 않은 대체 채널).",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "재구성, 실제 소스 아님 (추정)",
+          "lang": "python",
+          "code": "# 취약 구조 개념도\nsafe_globals = {\"__builtins__\": {}, \"http_get\": http_get, ...}\nexec(user_source, safe_globals)   # 같은 프로세스에서 일반 exec\n# http_get.__globals__ 에는 진짜 builtins가 남아 있음\n# 코드 객체 교체나 dunder 접근을 막는 계층이 없음"
+        },
+        {
+          "kind": "fix",
+          "label": "BerriAI/litellm 현재 소스 custom_code/sandbox.py 발췌",
+          "lang": "python",
+          "code": "def compile_sandboxed(source, filename=\"<guardrail>\"):\n    # RestrictedPython AST 변환: import, exec, dunder 이름을 컴파일 단계에서 거부\n    return compile_restricted(source=source, filename=filename,\n                              mode=\"exec\", policy=AsyncAwareTransformer)\n# 실행 시 _getattr_=safer_getattr 등 가드가 모든 속성 접근을 중개\n# (__globals__, __code__, __class__ 차단)"
+        }
+      ],
+      "trigger": "원격, 프록시 API에 대한 인증 필요(CVSS PR:L). 커스텀 코드 가드레일을 테스트하거나 등록할 수 있는 권한의 키가 필요하다. 관리 UI나 API가 인터넷에 노출된 셀프 호스팅 프록시가 주 대상.",
+      "exploitation": "가드레일 코드 안에서 노출된 프리미티브 함수의 내부 상태를 거쳐 원래 builtins에 도달하면 프록시 프로세스 권한의 임의 파이썬 실행이 된다. 그 다음은 환경 변수와 DB에 있는 공급자 API 키, 가상 키, 요청 로그 탈취로 이어진다(제3자 분석 기준).",
+      "patch": "현재 소스는 RestrictedPython(compile_restricted + safer_getattr, guarded_getitem 등)으로 전환됐고 바이트코드 교체, cr_frame 접근, NFKC 동형 문자 우회를 컴파일 단계에서 거부하는 회귀 테스트가 있다. 정확한 수정 버전 번호는 이번 조사에서 확인 못 함. 같은 프로세스 내 언어 수준 샌드박스라는 구조는 그대로라 완결성은 RestrictedPython 가드 품질에 달려 있다(추정). 임시 완화: 커스텀 코드 가드레일 기능 비활성화, 관리 엔드포인트 비노출.",
+      "detection": "프록시 접근 로그에서 /guardrails/test_custom_code 호출, 비관리자 키의 가드레일 생성 요청, litellm 프로세스의 셸 자식 프로세스나 예상 밖 아웃바운드 연결. 공급자 콘솔에서 API 키 사용량 급증 확인."
+    },
+    "deepDive": null
+  },
+  {
     "cve": "CVE-2026-58115",
     "date": "2026-11-02",
     "grade": "red",
@@ -4789,6 +5224,66 @@
           "code": "} catch (RuntimeException e) {  // 기존 AIOOBE에서 확대\n    return null;                // 디코딩 실패로 처리\n}\n// InboundSmsHandler: 실패 메시지는 raw 테이블에서 삭제해 재처리 차단"
         }
       ]
+    },
+    "deepDive": null
+  },
+  {
+    "cve": "CVE-2026-76535",
+    "date": "2026-11-20",
+    "grade": "orange",
+    "title": "Splunk Enterprise RapidDiag 빈 공유 비밀 수용으로 무인증 SPL 실행",
+    "product": "Splunk Enterprise 10.6.1, 10.4.5, 10.2.9, 10.0.12, 9.4.17 미만",
+    "summary": "RapidDiag 작업 수집 요청을 인증할 때 공유 비밀이 비어 있어도 통과시켜, 무인증 사용자가 인증된 사용자로서 임의 SPL 검색을 돌려 데이터와 설정을 읽고 고칠 수 있다. 같은 권고(SVD-2026-1103)의 CVE-2026-76536도 단독 인스턴스에서 빈 클러스터링 비밀을 인증 후보로 받아들이는 같은 패턴이다. 보안팀 SIEM 자체가 표적이 된다는 점에서 중요.",
+    "cvss": 9.1,
+    "kev": false,
+    "poc": false,
+    "tags": [
+      "splunk",
+      "siem",
+      "auth-bypass",
+      "empty-secret",
+      "spl",
+      "cwe-287"
+    ],
+    "links": [
+      {
+        "label": "Splunk 권고 SVD-2026-1103",
+        "url": "https://advisory.splunk.com/advisories/SVD-2026-1103"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-76535"
+      },
+      {
+        "label": "CVE.org",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-76535"
+      },
+      {
+        "label": "NVD CVE-2026-76536 (같은 패턴)",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-76536"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "RapidDiag 작업 수집 경로는 노드 간 공유 비밀로 요청을 인증하는데, 비밀이 설정되지 않은(빈 문자열) 상태에서 요청도 빈 값을 보내면 비교가 일치해 인증 성공으로 처리된다. '미설정 비밀은 어떤 값과도 일치하지 않아야 한다'는 불변식 위반. CVE-2026-76536도 클러스터링이 꺼진 단독 인스턴스에서 빈 pass4SymmKey를 공유 인증 후보로 받아들이는 같은 결함이다. CWE-287.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "재구성, 실제 소스 아님",
+          "lang": "python",
+          "code": "configured = conf.get(\"shared_secret\", \"\")   # 미설정이면 \"\"\nprovided = request.headers.get(\"X-Secret\", \"\")\nif hmac.compare_digest(configured, provided):  # \"\" == \"\" 통과\n    run_as_authenticated_user(task)"
+        },
+        {
+          "kind": "fix",
+          "label": "재구성, 실제 소스 아님",
+          "lang": "python",
+          "code": "configured = conf.get(\"shared_secret\")\nif not configured:            # 비밀 미설정이면 기능 자체 거부\n    raise Unauthorized()\nif not hmac.compare_digest(configured, provided):\n    raise Unauthorized()"
+        }
+      ],
+      "trigger": "원격, 무인증. Splunk 관리 포트(기본 8089)에 도달 가능해야 한다. 76536은 클러스터링을 쓰지 않는 단독 인스턴스가 대상.",
+      "exploitation": "인증된 사용자 권한의 SPL 실행으로 인덱스 데이터 열람과 설정 변경. 수집 데이터에 자격 증명이나 토큰이 있으면 횡적 이동으로 이어질 수 있다(추정).",
+      "patch": "10.6.1, 10.4.5, 10.2.9, 10.0.12, 9.4.17. 임시 완화: 8089 포트를 관리망으로 제한, 사용하지 않는 RapidDiag 비활성화.",
+      "detection": "_internal 인덱스의 splunkd_access.log에서 RapidDiag 관련 REST 경로 호출, _audit 인덱스의 출처 불명 검색 작업, 클러스터 설정 REST 엔드포인트 변경 이력."
     },
     "deepDive": null
   },
@@ -5028,6 +5523,192 @@
           "code": "void onDocumentEvent(Doc& d, Event e) {\n    Macro* m = d.boundMacro(e);\n    if (!d.macroSecurity().allowsDocumentMacros())  // 다른 문서와 같은 게이트\n        return;\n    m->run();\n}"
         }
       ]
+    },
+    "deepDive": null
+  },
+  {
+    "cve": "CVE-2026-86130",
+    "date": "2026-11-20",
+    "grade": "orange",
+    "title": "WatchGuard Dimension 로그 수집 서비스 무인증 SQL 실행에서 RCE",
+    "product": "WatchGuard Dimension 2.0 이상 2.3.2 미만",
+    "summary": "Firebox 로그를 모으는 Dimension의 로그 수집 서비스에 인증이 없어, 원격 무인증 공격자가 임의 SQL을 실행하고 최종적으로 WebUI 프로세스 사용자로 코드 실행까지 간다. 같은 날 Dimension 2.3.2에서 CRLF 주입, 명령 주입, 세션 ID 노출 등 10여 건이 함께 고쳐졌다.",
+    "cvss": 9.3,
+    "kev": false,
+    "poc": false,
+    "tags": [
+      "watchguard",
+      "dimension",
+      "log-collector",
+      "missing-auth",
+      "sqli",
+      "deserialization",
+      "cwe-306"
+    ],
+    "links": [
+      {
+        "label": "WatchGuard PSIRT CVE-2026-86130",
+        "url": "https://psirt.watchguard.com/CVE-2026-86130"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-86130"
+      },
+      {
+        "label": "CVE.org",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-86130"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "로그 수집 서비스는 원래 등록된 Firebox 장비만 말을 걸 것을 전제로 설계됐지만, 연결 상대를 인증하지 않는다(CWE-306). 이 서비스가 받은 요청을 내부 DB 질의로 중계하면서 공격자가 SQL을 사실상 직접 실행하게 되고(CWE-441, 혼동된 대리자), 거기서 역직렬화 결함(CWE-502)을 거쳐 WebUI 프로세스 권한 코드 실행으로 이어진다. 구체적 프로토콜과 필드는 공개 자료로 확인 못 함.",
+      "trigger": "원격, 무인증. Dimension 로그 수집 포트에 도달 가능해야 한다. Firebox가 원격 지사에서 로그를 보내는 구성이면 이 포트가 인터넷에 열려 있는 경우가 있다.",
+      "exploitation": "SQL 실행으로 로그와 설정 열람, 변조, 이후 역직렬화를 통해 WebUI 사용자 권한 코드 실행. Dimension은 관리 중인 Firebox 정보를 들고 있어 방화벽 관리 평면으로 이어질 수 있다(추정).",
+      "patch": "Dimension 2.3.2. 임시 완화: 로그 수집 포트를 등록된 Firebox IP로만 허용.",
+      "detection": "Dimension 로그 수집 포트로 등록되지 않은 출발지의 연결, DB 로그의 비정상 질의, WebUI 프로세스의 셸 자식 프로세스."
+    },
+    "deepDive": null
+  },
+  {
+    "cve": "CVE-2026-90436",
+    "date": "2026-11-20",
+    "grade": "red",
+    "title": "Apache Axis 1.x SOAP fault exceptionName 임의 클래스 인스턴스화",
+    "product": "Apache Axis 1.x 전 버전 (1.4까지, EOL, 공식 수정 릴리스 없음)",
+    "summary": "인바운드 SOAP Fault의 detail/exceptionName에 적힌 클래스를 Axis가 로드하고, data 문자열이 있으면 String 생성자로 인스턴스화한 뒤에야 AxisFault인지 확인한다. 이 파싱은 서비스 디스패치 중 서비스별 핸들러 체인 이전에 일어나 인증 핸들러를 우회한다. 11월 18일 CISA KEV 등재, 제3자 보도로는 Confluence Data Center, N-central 등 Axis 1을 내장한 제품에서 악용 언급.",
+    "cvss": 9.8,
+    "kev": true,
+    "poc": false,
+    "tags": [
+      "apache-axis",
+      "soap",
+      "unsafe-reflection",
+      "java",
+      "eol",
+      "kev",
+      "cwe-470"
+    ],
+    "links": [
+      {
+        "label": "apache/axis-axis1-java 수정 커밋 41f3b4e",
+        "url": "https://github.com/apache/axis-axis1-java/commit/41f3b4e8d04e310ca81f86b92630ab2c11d608bd"
+      },
+      {
+        "label": "Apache 메일링 리스트 공지",
+        "url": "https://lists.apache.org/thread/8slf0j9gz35z56t0glt5h0ncwlbn4bdz"
+      },
+      {
+        "label": "oss-security 공지",
+        "url": "https://openwall.com/lists/oss-security/2026/11/06/12"
+      },
+      {
+        "label": "CISA KEV 카탈로그",
+        "url": "https://www.cisa.gov/known-exploited-vulnerabilities-catalog"
+      },
+      {
+        "label": "Daily Security Review 악용 보도 (Confluence, N-central)",
+        "url": "https://dailysecurityreview.com/?p=45870"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-90436"
+      },
+      {
+        "label": "CVE.org",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-90436"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "org.apache.axis.message.SOAPFaultDetailsBuilder.setValue가 detail 안의 exceptionName 값을 ClassUtils.forName(name)으로 로드하는데, 이 경로는 Class.forName(name, true, loader)라 클래스 로드만으로 static 초기화 블록이 실행된다. 이어서 SOAPFaultBuilder.createFault가 faultClass.getConstructor(String 등)로 생성자를 찾아 newInstance(faultData)를 호출하고, 그 결과를 (AxisFault)로 캐스트한다. 타입 확인이 캐스트 시점, 즉 생성자 실행 뒤에야 일어나고 ClassCastException은 빈 catch로 삼켜진다. 깨진 불변식은 'fault로 복원되는 클래스는 AxisFault 하위 타입이어야 한다'인데, 이게 사용 전이 아니라 사용 후에 검사된다. CWE-470(외부 입력으로 클래스 선택).",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "apache/axis-axis1-java 커밋 41f3b4e 이전 코드 발췌",
+          "lang": "java",
+          "code": "// SOAPFaultDetailsBuilder.setValue\nClass faultClass = ClassUtils.forName(faultClassName); // 메시지 속 이름, 로드 시 static 초기화 실행\nbuilder.setFaultClass(faultClass);\n\n// SOAPFaultBuilder.createFault\nConstructor con = faultClass.getConstructor(new Class[] { argClass });\nf = (AxisFault) con.newInstance(new Object[] { faultData }); // 생성자 실행 후에야 캐스트로 타입 확인\n} catch(Exception e){ /* 조용히 무시 */ }"
+        },
+        {
+          "kind": "fix",
+          "label": "apache/axis-axis1-java 커밋 41f3b4e 발췌",
+          "lang": "java",
+          "code": "// 초기화 없이 로드하고 AxisFault 하위 타입만 수용\nClass faultClass = ClassUtils.forName(faultClassName, false);\nif (AxisFault.class.isAssignableFrom(faultClass)) {\n    builder.setFaultClass(faultClass);\n}\n// createFault: 생성자 호출 자체를 AxisFault 하위 타입일 때로 제한\nif (AxisFault.class.isAssignableFrom(faultClass)) { ... con.newInstance(...) ... }"
+        }
+      ],
+      "trigger": "원격, 무인증. Axis 1 SOAP 엔드포인트에 요청을 보낼 수 있으면 된다. 엔진이 서비스 해석 과정에서 본문을 강제로 파싱하므로 서비스별 인증 핸들러가 붙어 있어도 막지 못한다. 실제 코드 실행까지 가려면 애플리케이션 클래스패스에 String 하나를 받는 생성자나 static 초기화에서 위험한 동작을 하는 클래스가 있어야 한다.",
+      "exploitation": "프리미티브는 '클래스패스 위 임의 클래스의 String 생성자 호출'이다. 커밋 메시지는 Spring의 ClassPathXmlApplicationContext(ActiveMQ CVE-2023-46604에서 쓰인 것과 같은 계열)를 예로 든다. 이런 클래스는 생성자에서 원격 설정을 읽어 빈을 만들기 때문에 결과적으로 서버 프로세스 권한의 코드 실행으로 이어진다. 구체적 페이로드나 요청 형태는 다루지 않는다.",
+      "patch": "Axis 1은 EOL이라 공식 1.x 릴리스는 나오지 않는다. 수정은 커밋 41f3b4e 하나로, (1) exceptionName 클래스를 initialize=false로 로드, (2) setFaultClass와 생성자 호출 모두 AxisFault.class.isAssignableFrom 검사 뒤로 이동, (3) ClassUtils.forName의 3인자 오버로드가 init 플래그를 무시하던 버그도 수정. 회귀 테스트 TestFaultClassInstantiation 추가. 근본 대책은 Axis2 등으로 이전이고, 내장 제품은 각 벤더 패치를 따라야 한다. 임시로는 Axis 엔드포인트의 외부 노출 차단.",
+      "detection": "공개된 IoC 세트는 확인 못 함. 관점: SOAP 요청 본문에 Fault, detail, exceptionName 요소가 들어 있는 인바운드 요청(정상 서버는 Fault를 받는 쪽이 아님), Java 프로세스가 외부 URL에서 XML 설정을 가져오는 아웃바운드 연결, 웹 컨테이너(java.exe, tomcat)의 자식 프로세스 생성(Sysmon EID 1, Windows Security 4688)."
+    },
+    "deepDive": null
+  },
+  {
+    "cve": "CVE-2026-90817",
+    "date": "2026-11-20",
+    "grade": "red",
+    "title": "REDCap 설문 passthru 경로와 데이터 가져오기 결합 무인증 RCE",
+    "product": "Vanderbilt REDCap 13.3.0 이상 (16.0.49, 17.3.10, 17.4.4에서 수정)",
+    "summary": "공개 설문 컨텍스트에서 의도되지 않은 컨트롤러 라우트로 넘어갈 수 있는 passthru 라우팅 결함과, 데이터 가져오기 처리에서 파일 경로/스트림 파라미터를 외부가 지정할 수 있는 결함이 결합돼 무인증 코드 실행이 된다. 유효한 공개 설문 해시 하나만 알면 되는데, 공개 설문 링크는 원래 공개다. 9월 공개, 11월 18일 CISA KEV 등재.",
+    "cvss": 9.8,
+    "kev": true,
+    "poc": false,
+    "tags": [
+      "redcap",
+      "php",
+      "research-platform",
+      "routing",
+      "code-injection",
+      "kev",
+      "cwe-94",
+      "cwe-73"
+    ],
+    "links": [
+      {
+        "label": "Securifera 권고 목록",
+        "url": "https://www.securifera.com/advisories/"
+      },
+      {
+        "label": "REDCap 커뮤니티 공지",
+        "url": "https://projectredcap.org/resources/community"
+      },
+      {
+        "label": "CISA KEV 카탈로그",
+        "url": "https://www.cisa.gov/known-exploited-vulnerabilities-catalog"
+      },
+      {
+        "label": "TheHackerWire 분석",
+        "url": "https://www.thehackerwire.com/redcap-unauthenticated-rce-via-survey-passthrough-and-data-import-cve-2026-90817/"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-90817"
+      },
+      {
+        "label": "CVE.org",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-90817"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "REDCap은 공개 설문 페이지(인증 없음)에서 일부 기능 호출을 내부 컨트롤러로 넘기는 passthru 라우팅을 둔다. 이 라우팅이 허용 목록을 충분히 좁히지 않아 공개 설문 컨텍스트에서 원래 로그인 사용자용인 데이터 가져오기 컨트롤러에 닿는다(CWE-288 성격의 인가 경로 문제). 가져오기 처리는 요청이 준 파일 경로 또는 스트림 파라미터를 그대로 열어(CWE-73) 내용이 코드로 평가되는 경로에 들어간다(CWE-94). 두 경계(설문 컨텍스트 대 인증 컨텍스트, 업로드 데이터 대 실행 코드)가 모두 깨진 구조. 함수명 등 소스 수준 세부는 공개 자료로 확인 못 함.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "재구성, 실제 소스 아님 (추정)",
+          "lang": "php",
+          "code": "// 공개 설문 passthru: 라우트 이름을 요청에서 받음\n$route = $_GET['route'];\nif (isSurveyContext($_GET['s'])) {\n    dispatch($route);  // 설문용 라우트인지 확인 없이 디스패치\n}\n// 가져오기: 경로/스트림을 요청이 지정\n$data = file_get_contents($_POST['import_path']); // php:// 등 래퍼도 허용"
+        },
+        {
+          "kind": "fix",
+          "label": "재구성, 실제 소스 아님 (수정 방향 추정)",
+          "lang": "php",
+          "code": "if (!in_array($route, SURVEY_PASSTHRU_ALLOWLIST, true)) deny(403);\n// 가져오기는 업로드된 임시 파일만, 경로는 서버가 결정\n$path = $_FILES['import']['tmp_name'];\nif (!is_uploaded_file($path)) deny(400);"
+        }
+      ],
+      "trigger": "원격, 무인증. 대상 기관의 유효한 공개 설문 해시(설문 URL의 s 파라미터)를 알아야 한다. 대학과 병원 연구 기관이 주로 운영하며 설문 링크는 배포 목적상 외부에 공개돼 있는 경우가 많다.",
+      "exploitation": "웹 서버 사용자 권한의 PHP 코드 실행. 이후 연구 데이터(환자, 참여자 개인정보) 유출이 핵심 피해. 6월부터 UNC6508로 추적되는 REDCap 초기 침투 캠페인 보도가 있었으나 이 CVE와의 직접 연결은 확인 못 함.",
+      "patch": "REDCap 16.0.49(LTS), 17.3.10, 17.4.4 이상. 패치 diff는 비공개 소스라 확인 불가.",
+      "detection": "웹 로그에서 공개 설문 URL(surveys/ 경로, s= 파라미터)과 함께 데이터 가져오기 관련 라우트나 비정상 파라미터가 섞인 요청, 웹 루트와 temp 디렉터리의 신규 .php 파일, php-fpm이나 httpd의 셸 자식 프로세스."
     },
     "deepDive": null
   },

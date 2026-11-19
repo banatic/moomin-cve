@@ -100,5 +100,11 @@
     "note": "CISA KEV 11/17 갱신분 반영: Puppet Server 보고서 rich data 역직렬화 RCE(KEV, PoC 공개). Apache Roller XML-RPC 확장 타입 사전 인증 역직렬화가 4.0.0까지 확대되고 실제 악용 확인(6.1.6). Incus 7.6.0 13건 묶음 중 mTLS 체인 전체 대조 인증 우회(10.0), OCI 설정 줄바꿈 주입, rebuild 후 idmap 누락. Chrome 158 보안 수정 204건(Critical 6).",
     "count": 6,
     "deepDive": null
+  },
+  {
+    "date": "2026-11-20",
+    "note": "CISA KEV 11/18 신규 4건: Apache Axis 1 SOAP fault exceptionName 임의 클래스 인스턴스화(EOL, 커밋 41f3b4e), LiteLLM 커스텀 코드 가드레일 샌드박스 탈출, Synology DSM synoplugind RCE(C3RB3R 랜섬웨어 보도), REDCap 설문 passthru RCE. vCenter vmdir 인증 우회, PHP 세션 묶음(업로드 진행률 기본 Off), Splunk 빈 공유 비밀, MiCollab AWV, WatchGuard Dimension. 연구용: OpenVPN 대화형 서비스 CommandLineToArgvW 대 CRT 파서 불일치.",
+    "count": 11,
+    "deepDive": null
   }
 ]
