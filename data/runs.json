@@ -106,5 +106,11 @@
     "note": "CISA KEV 11/18 신규 4건: Apache Axis 1 SOAP fault exceptionName 임의 클래스 인스턴스화(EOL, 커밋 41f3b4e), LiteLLM 커스텀 코드 가드레일 샌드박스 탈출, Synology DSM synoplugind RCE(C3RB3R 랜섬웨어 보도), REDCap 설문 passthru RCE. vCenter vmdir 인증 우회, PHP 세션 묶음(업로드 진행률 기본 Off), Splunk 빈 공유 비밀, MiCollab AWV, WatchGuard Dimension. 연구용: OpenVPN 대화형 서비스 CommandLineToArgvW 대 CRT 파서 불일치.",
     "count": 11,
     "deepDive": null
+  },
+  {
+    "date": "2026-11-21",
+    "note": "CISA KEV 11/20 신규 4건: Cisco Expressway 클러스터 DB 고정 쿠키 root RCE(PoC 공개 후 악용), SAP NetWeaver Portal JNDI 속성 주입(2025년 패치), vCenter vmdir 인증 우회(ARMORY CASTLE 제로데이, red 상향), Apache Roller(KEV 반영). pip 번들 certifi의 침해된 eMudhra 루트(26.2.2 수정), Netatalk DHX2 상태 머신 재진입 UAF.",
+    "count": 4,
+    "deepDive": null
   }
 ]

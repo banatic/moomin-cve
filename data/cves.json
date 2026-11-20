@@ -125,6 +125,70 @@
     "deepDive": null
   },
   {
+    "cve": "CVE-2025-42884",
+    "date": "2026-11-21",
+    "grade": "red",
+    "title": "SAP NetWeaver Enterprise Portal 무인증 JNDI 속성 주입",
+    "product": "SAP NetWeaver Enterprise Portal (EP-BASIS 7.50, EP-RUNTIME 7.50)",
+    "summary": "Enterprise Portal이 외부 입력으로 JNDI 환경 속성이나 lookup URL을 받아 들여 공격자가 지정한 JNDI 공급자에 접속하게 만들 수 있다. 2025년 11월 SAP 패치데이(노트 3660969)로 고쳐진 1년 묵은 버그인데 11/20 CISA KEV에 등재됐다. CVSS 6.5지만 JNDI 공급자 통제는 상황에 따라 더 큰 영향으로 번질 수 있어 등재 의미가 있다.",
+    "cvss": 6.5,
+    "kev": true,
+    "poc": false,
+    "tags": [
+      "sap",
+      "netweaver",
+      "enterprise-portal",
+      "jndi",
+      "injection",
+      "cwe-943"
+    ],
+    "links": [
+      {
+        "label": "SAP Note 3660969",
+        "url": "https://me.sap.com/notes/3660969"
+      },
+      {
+        "label": "CISA KEV 추가 공지 (11/20)",
+        "url": "https://www.cisa.gov/news-events/alerts/2026/11/20/cisa-adds-four-known-exploited-vulnerabilities-catalog"
+      },
+      {
+        "label": "SAP Security Patch Day",
+        "url": "https://url.sap/sapsecuritypatchday"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2025-42884"
+      },
+      {
+        "label": "CVE.org",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2025-42884"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "Enterprise Portal의 어떤 엔드포인트가 요청 값을 InitialContext 생성용 환경 속성(Hashtable)이나 lookup 대상 이름으로 그대로 넘긴다. JNDI는 java.naming.factory.initial, java.naming.provider.url 같은 속성으로 어떤 공급자에 어떤 프로토콜로 붙을지를 정하므로, 이 값을 외부가 정하면 서버가 공격자의 LDAP나 RMI 공급자에 접속한다. CWE-943(데이터 쿼리 로직의 특수 요소 미처리)로 분류됐다. 취약한 컴포넌트와 파라미터 이름은 SAP 노트가 로그인 전용이라 공개 자료로 확인 못 함.",
+      "trigger": "원격, 무인증. 포털 HTTP(S)에 도달 가능하면 된다. 서버가 공격자 JNDI 공급자로 나가는 아웃바운드 연결이 가능해야 영향이 커진다(추정).",
+      "exploitation": "실제 악용됨(CISA KEV, SSVC Exploitation active). 벤더 설명상 영향은 서버 정보의 노출과 변조이고 가용성 영향은 없다. 공격 캠페인 세부와 공개 PoC는 확인 못 함.",
+      "patch": "2025년 11월 SAP Security Patch Day의 노트 3660969 적용. 1년 전 패치라 적용 여부 점검이 핵심이다. 임시 완화책은 공개 자료로 확인 못 함. 포털 서버의 외부 아웃바운드 LDAP/RMI 차단이 피해 축소에 도움(추정).",
+      "detection": "포털 서버에서 외부 주소로 나가는 LDAP(389/636), RMI(1099) 등 아웃바운드 연결, HTTP 접근 로그에서 java.naming 계열 문자열이나 ldap://, rmi:// URL이 들어간 요청. SAP 공식 IOC는 확인 못 함.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "재구성, 실제 소스 아님 (CVE 설명 기반 추정)",
+          "lang": "java",
+          "code": "Hashtable<String,String> env = new Hashtable<>();\nfor (String k : req.getParameterNames())\n    env.put(k, req.getParameter(k));   // 요청 값이 JNDI 환경 속성이 됨\nContext ctx = new InitialContext(env);   // provider.url도 공격자가 지정\nObject o = ctx.lookup(req.getParameter(\"name\"));"
+        },
+        {
+          "kind": "fix",
+          "label": "재구성, 실제 소스 아님 (수정 방향)",
+          "lang": "java",
+          "code": "Context ctx = new InitialContext();   // 서버 기본 공급자만 사용\nString name = req.getParameter(\"name\");\nif (!ALLOWED_NAMES.contains(name))      // 허용 목록의 로컬 이름만\n    throw new SecurityException(\"bad jndi name\");\nObject o = ctx.lookup(name);"
+        }
+      ]
+    },
+    "deepDive": null
+  },
+  {
     "cve": "CVE-2026-102703",
     "date": "2026-11-06",
     "grade": "orange",
@@ -2822,12 +2886,12 @@
   {
     "cve": "CVE-2026-123890",
     "date": "2026-11-20",
-    "grade": "orange",
+    "grade": "red",
     "title": "vCenter VMware Directory Service 인증 우회",
     "product": "VMware vCenter 9.1.x, 9.0.x, 8.0 (U3m 미만), 5.x (VCF), Telco Cloud Platform",
-    "summary": "vCenter에 내장된 VMware Directory Service(vmdir, LDAP 기반 SSO 디렉터리)에서 대체 경로를 통한 인증 우회가 있다. 무인증 원격, CVSS 9.8. 현재 악용 보고는 없지만 vCenter는 과거 KEV 단골이라 우선 패치 대상이다.",
+    "summary": "vCenter에 내장된 VMware Directory Service(vmdir, LDAP 기반 SSO 디렉터리)의 대체 경로 인증 우회. 무인증 원격, CVSS 9.8. 11/20 CISA KEV 등재, Google 위협 인텔리전스가 중국 연계 그룹 ARMORY CASTLE이 패치 수개월 전부터 제로데이로 악용했다고 공개했다.",
     "cvss": 9.8,
-    "kev": false,
+    "kev": true,
     "poc": false,
     "tags": [
       "vmware",
@@ -2836,12 +2900,21 @@
       "ldap",
       "sso",
       "auth-bypass",
-      "cwe-288"
+      "cwe-288",
+      "china-nexus"
     ],
     "links": [
       {
         "label": "Broadcom 보안 권고 39495",
         "url": "https://support.broadcom.com/web/ecx/support-content-notification/-/external/content/SecurityAdvisories/0/39495"
+      },
+      {
+        "label": "Google 위협 인텔리전스: ARMORY CASTLE Exploits vSphere",
+        "url": "https://cloud.google.com/blog/topics/threat-intelligence/armory-castle-exploits-vsphere"
+      },
+      {
+        "label": "CISA KEV 추가 공지 (11/20)",
+        "url": "https://www.cisa.gov/news-events/alerts/2026/11/20/cisa-adds-four-known-exploited-vulnerabilities-catalog"
       },
       {
         "label": "NVD",
@@ -2852,13 +2925,18 @@
         "url": "https://www.cve.org/CVERecord?id=CVE-2026-123890"
       }
     ],
-    "history": [],
+    "history": [
+      {
+        "date": "2026-11-21",
+        "note": "11/20 CISA KEV 등재, Google이 ARMORY CASTLE의 제로데이 악용 공개. orange에서 red로 상향."
+      }
+    ],
     "detail": {
       "rootCause": "벤더는 'VMware Directory Service의 인증 우회, CWE-288(대체 경로나 채널을 통한 인증 우회)'만 밝혔다. vmdir은 vCenter SSO의 사용자, 그룹, 서비스 계정을 담는 LDAP 디렉터리라 이 계층의 인증 우회는 SSO 관리자 권한 획득과 사실상 같다(추정). 어떤 LDAP 연산이나 바인드 경로가 문제인지는 공개 자료로 확인 못 함.",
-      "trigger": "원격, 무인증. vmdir 서비스 포트(LDAP 389/636 등)에 네트워크로 도달 가능해야 한다(추정). 관리망 분리가 안 된 환경이 위험.",
-      "exploitation": "공개된 세부 없음. 디렉터리 쓰기가 가능하면 SSO 관리자 계정 생성이나 그룹 변경으로 vCenter 전체와 하위 ESXi 장악으로 이어질 수 있다(추정).",
+      "trigger": "원격, 무인증. vmdir 서비스 포트에 네트워크로 도달 가능해야 한다. 방어 측 글들은 vCenter 2012 포트(vmdir 레거시 LDAP 리스너)를 차단 대상으로 꼽는다. 관리망 분리가 안 된 환경이 위험.",
+      "exploitation": "실제 악용됨. Google 위협 인텔리전스가 ARMORY CASTLE의 vSphere 공격 체인을 공개했다. 인증 우회 뒤 디렉터리 쓰기로 SSO 관리자 권한을 얻고 vCenter와 하위 ESXi로 이어지는 흐름으로 보도됐다. 바인드 경로 수준의 세부는 공개 자료로 확인 못 함.",
       "patch": "vCenter 9.1.1.0200, 9.0.2.0200, 8.0 U3m, VCF 5.2.5. Telco Cloud는 KB463116 참고. 임시 완화책 공개 여부는 확인 못 함.",
-      "detection": "vmdir 감사 로그(/var/log/vmware/vmdird/)에서 비정상 바인드, 새 계정이나 SSO 그룹(Administrators) 멤버십 변경, 관리망 외부에서 vCenter 389/636 포트로의 연결."
+      "detection": "vmdir 감사 로그(/var/log/vmware/vmdird/)에서 비정상 바인드, 새 계정이나 SSO Administrators 그룹 멤버십 변경, 관리망 외부에서 vCenter 389/636/2012 포트로의 연결. Google 블로그의 IOC로 과거 로그 소급 점검 권장(제로데이 기간이 길다)."
     },
     "deepDive": null
   },
@@ -4124,7 +4202,7 @@
     "product": "Apache Roller 4.0.0 이상 6.1.5 이하 (6.1.6에서 수정)",
     "summary": "Roller의 XML-RPC 엔드포인트가 Apache XML-RPC 라이브러리의 벤더 확장 타입을 켠 채로 배포돼서, 인증 전에 요청 본문의 Java 직렬화 객체를 복원해. 9월에 CVE-2026-82384로 6.1.5만 영향이라고 냈던 걸 4.0.0까지 넓혀 다시 낸 것이고, Apache가 실제 악용 중이라고 밝혔어. 관리 UI에서 XML-RPC를 끄는 걸로는 안 막혀.",
     "cvss": 9.8,
-    "kev": false,
+    "kev": true,
     "poc": false,
     "tags": [
       "apache-roller",
@@ -4139,6 +4217,10 @@
       {
         "label": "Apache 공지 (lists.apache.org)",
         "url": "https://lists.apache.org/thread/cc0jck13nb9vvcmzxzwotr6n16mx28z9"
+      },
+      {
+        "label": "CISA KEV 추가 공지 (11/20)",
+        "url": "https://www.cisa.gov/news-events/alerts/2026/11/20/cisa-adds-four-known-exploited-vulnerabilities-catalog"
       },
       {
         "label": "apache/roller PR 171",
@@ -4165,7 +4247,12 @@
         "url": "https://www.cve.org/CVERecord?id=CVE-2026-129448"
       }
     ],
-    "history": [],
+    "history": [
+      {
+        "date": "2026-11-21",
+        "note": "11/20 CISA KEV 등재(kev true)."
+      }
+    ],
     "detail": {
       "rootCause": "Roller는 /roller-services/xmlrpc에 Apache XML-RPC 라이브러리의 서블릿을 매핑하는데, web.xml에서 enabledForExtensions를 true로 둬서 라이브러리의 벤더 확장 타입(ex 네임스페이스)을 받아들였어. 확장 타입 중 직렬화 타입은 요청 XML 안의 base64 데이터를 Java ObjectInputStream으로 복원하는데, 이건 XML 파싱 단계에서 일어나고 Roller의 인증(사용자명, 비밀번호가 메서드 인자로 들어옴)은 그 뒤 핸들러에서야 검사돼. 즉 '파싱 후 인증' 순서 때문에 무인증 역직렬화(CWE-502)가 돼. Roller 자체는 표준 XML-RPC 값 타입만 쓰니 확장 기능은 처음부터 필요 없었어. 같은 라이브러리 설정 문제는 예전 Apache XML-RPC 자체 CVE(CVE-2016-5003, CVE-2019-17570)와 같은 계열이야.",
       "code": [
@@ -4805,6 +4892,73 @@
     "deepDive": null
   },
   {
+    "cve": "CVE-2026-133949",
+    "date": "2026-11-21",
+    "grade": "orange",
+    "title": "pip 번들 certifi에 침해된 eMudhra 루트 잔존",
+    "product": "pip 26.2.2 미만 (번들 certifi)",
+    "summary": "pip는 자체 번들 certifi의 cacert.pem으로 PyPI TLS를 검증하는데, 26.2.2 미만은 개인키가 침해된 eMudhra emSign 계열 루트를 아직 신뢰한다. 이 체인으로 발급된 위조 인증서로 pip 설치 트래픽 MITM이 이론상 가능하다. 11/20 CVE 발행, 실제 악용 보고는 없음.",
+    "cvss": 9.3,
+    "kev": false,
+    "poc": false,
+    "tags": [
+      "pip",
+      "python",
+      "certifi",
+      "pki",
+      "emudhra",
+      "supply-chain",
+      "cwe-295"
+    ],
+    "links": [
+      {
+        "label": "GitHub 권고 GHSA-6q48-6c7w-9gw2",
+        "url": "https://github.com/advisories/ghsa-6q48-6c7w-9gw2"
+      },
+      {
+        "label": "Python 공지: eMudhra emSign 인시던트",
+        "url": "https://discuss.python.org/t/information-for-python-users-regarding-emudhra-emsign-ca-certificate-security-incident/109576"
+      },
+      {
+        "label": "pypa/pip PR 14371",
+        "url": "https://github.com/pypa/pip/pull/14371"
+      },
+      {
+        "label": "PSF 블로그: Python 생태계의 대응",
+        "url": "https://pyfound.blogspot.com/2026/11/how-python-ecosystem-responded-to.html"
+      },
+      {
+        "label": "CPython 측 CVE-2026-115557",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-115557"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-133949"
+      },
+      {
+        "label": "CVE.org",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-133949"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "pip는 OS 신뢰 저장소가 아니라 src/pip/_vendor/certifi/cacert.pem(Mozilla 루트 묶음 사본)을 기본 신뢰 앵커로 쓴다. eMudhra emSign 중간 CA들의 개인키가 약한 키 생성으로 복구 가능해 침해된 사건(CVE-2026-111943) 이후 브라우저와 OS는 차단했지만, pip에 벤더링된 certifi 2026.07.22에는 emSign 루트 4개가 남아 있었다. 신뢰 저장소가 패키지 안에 고정 복사돼 있으면 상위 폐기가 자동 전파되지 않는다는 공급망 구조 문제다. CWE-295.",
+      "trigger": "네트워크 경로상 공격자(MITM). 피해자가 26.2.2 미만 pip로 HTTPS 인덱스에 접속하고, 사용하는 Python이 침해 중간 CA를 자체적으로 거부하지 않아야 한다. 공격자는 침해된 emSign 중간 CA 키로 서명한 위조 서버 인증서가 필요하다.",
+      "exploitation": "이론상 가능, 악용 보고 없음. 위조 인증서로 pypi.org나 사설 인덱스를 사칭하면 패키지 설치 시 임의 코드(setup.py, 빌드 백엔드)가 실행되는 공급망 경로로 이어진다. 해시 고정(--require-hashes)을 쓰면 패키지 변조는 막힌다.",
+      "patch": "pip 26.2.2가 certifi 2026.10.18로 올려 emSign 루트 4개를 제거했다. 업그레이드 자체가 취약한 pip로 내려받는 닭과 달걀 문제라, 권고는 침해 중간 CA를 거부하는 Python(CVE-2026-115557 수정판)으로 먼저 올리거나 해시 고정으로 pip를 설치하라고 한다. 컨테이너 이미지, 가상환경마다 남은 구버전 pip도 점검 대상.",
+      "detection": "python -m pip --version으로 26.2.2 미만 탐색, 각 환경의 site-packages/pip/_vendor/certifi/cacert.pem에서 emSign 문자열 검색. 네트워크 측에서는 PyPI 접속 TLS 체인에 emSign 중간 CA가 등장하는지 TLS 검사 장비로 확인.",
+      "code": [
+        {
+          "kind": "fix",
+          "label": "pypa/pip 커밋 922f23e (PR 14371) 발췌",
+          "lang": "diff",
+          "code": "# src/pip/_vendor/certifi/__init__.py\n-__version__ = \"2026.07.22\"\n+__version__ = \"2026.10.18\"\n# src/pip/_vendor/certifi/cacert.pem  (104줄 삭제)\n-# Label: \"emSign Root CA - G1\"\n-# Label: \"emSign ECC Root CA - G3\"\n-# Label: \"emSign Root CA - C1\"\n-# Label: \"emSign ECC Root CA - C3\""
+        }
+      ]
+    },
+    "deepDive": null
+  },
+  {
     "cve": "CVE-2026-13684",
     "date": "2026-11-05",
     "grade": "red",
@@ -5222,6 +5376,141 @@
           "label": "커밋 735d967 설명 기반 (재구성, 실제 소스 아님)",
           "lang": "Java",
           "code": "} catch (RuntimeException e) {  // 기존 AIOOBE에서 확대\n    return null;                // 디코딩 실패로 처리\n}\n// InboundSmsHandler: 실패 메시지는 raw 테이블에서 삭제해 재처리 차단"
+        }
+      ]
+    },
+    "deepDive": null
+  },
+  {
+    "cve": "CVE-2026-62318",
+    "date": "2026-11-21",
+    "grade": "green",
+    "title": "Netatalk DHX2 인증 상태 머신 재진입으로 사전 인증 UAF와 이중 해제",
+    "product": "Netatalk 2.0.0 ~ 4.5.0 (DHX2, DHX2-PAM UAM)",
+    "summary": "AFP 서버 Netatalk의 DHX2 로그인 핸드셰이크가 상태를 추적하지 않아, 첫 번째 continuation(logincont1)을 같은 retID로 다시 부르면 이미 해제된 전역 gcry_mpi_t Ra를 다시 쓰고 다시 해제한다. 무인증 원격으로 afpd 워커를 반복 크래시시키는 게 시연됐고 코드 실행은 시연되지 않았다. 4.5.1 수정.",
+    "cvss": 9.3,
+    "kev": false,
+    "poc": false,
+    "tags": [
+      "netatalk",
+      "afp",
+      "uaf",
+      "double-free",
+      "state-machine",
+      "libgcrypt",
+      "pre-auth",
+      "cwe-416"
+    ],
+    "links": [
+      {
+        "label": "GitHub 권고 GHSA-5wp7-47vr-j2mh",
+        "url": "https://github.com/Netatalk/netatalk/security/advisories/GHSA-5wp7-47vr-j2mh"
+      },
+      {
+        "label": "Netatalk 커밋 c2ea1f4",
+        "url": "https://github.com/Netatalk/netatalk/commit/c2ea1f459d85c17a43378ea85a19912ce5eb3dd1"
+      },
+      {
+        "label": "Netatalk 4.5.1 릴리스",
+        "url": "https://github.com/Netatalk/netatalk/releases/tag/netatalk-4-5-1"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-62318"
+      },
+      {
+        "label": "CVE.org",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-62318"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "etc/uams/uams_dhx2_pam.c와 uams_dhx2_passwd.c는 DH 교환 비밀 Ra, serverNonce, K_MD5hash를 파일 전역 정적 변수로 두고, dhx2_setup에서 할당하고 logincont1의 exit 경로에서 gcry_mpi_release(Ra)로 해제한다. 그런데 해제 후 포인터를 NULL로 만들지 않고, 현재 핸드셰이크가 몇 단계에 있는지도 기록하지 않는다. pam_logincont는 retID == ID만 보고 logincont1로 분기하므로 같은 ID로 첫 continuation을 한 번 더 보내면 gcry_mpi_powm(K, Mb, Ra, p)가 해제된 Ra를 읽고 exit에서 다시 gcry_mpi_release(Ra)를 호출한다. 깨진 불변식은 \"각 continuation은 정해진 순서로 정확히 한 번\"이고, 버그 클래스는 프로토콜 상태 머신 결여에서 오는 UAF와 이중 해제(CWE-416, CWE-415)다.",
+      "trigger": "원격, 무인증. afp.conf의 uam list에 uams_dhx2.so나 uams_dhx2_pam.so가 켜져 있고 AFP(TCP 548)에 도달 가능해야 한다. macOS 클라이언트 호환 때문에 NAS 기본값에 DHX2가 들어간 경우가 많다.",
+      "exploitation": "이론상 가능. 시연된 건 권한 있는 afpd 워커의 반복 크래시(DoS)뿐이다. libgcrypt MPI 객체의 UAF와 이중 해제는 힙 할당자 프리미티브가 될 수 있지만 연구자도 코드 실행은 보이지 않았다. 워커가 연결마다 fork되는 구조라 크래시가 서비스 전체 중단으로 바로 이어지진 않는다(추정).",
+      "patch": "4.5.1에서 dhx2_state 열거형으로 IDLE, EXPECT_CONT1, EXPECT_CONT2 단계를 강제하고, 해제 헬퍼 dhx2_release_mpi가 포인터를 NULL로 만들며, 실패나 재시작 시 dhx2_clear_session으로 전역 상태를 일괄 초기화한다. pam_logincont 분기에도 상태 조건이 붙었다. 임시 완화는 uam list에서 DHX2 계열을 빼는 것.",
+      "detection": "afpd 로그(logtype_uams)의 \"DHX2: unexpected first login continuation\"은 패치 후 거부 흔적이고, 패치 전에는 afpd 자식 프로세스의 SIGSEGV나 SIGABRT(glibc double free 감지) 반복, 같은 출발지의 짧은 AFP 로그인 시도 반복.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "Netatalk c2ea1f4의 부모 커밋, uams_dhx2_pam.c 발췌",
+          "lang": "c",
+          "code": "/* logincont1 */\n    gcry_mpi_powm(K, Mb, Ra, p);   /* 두 번째 호출이면 해제된 Ra 사용 */\n    ...\nexit:\n    gcry_mpi_release(Ra);          /* 해제 후 NULL로 안 바꿈 -> 재호출 시 이중 해제 */\n\n/* pam_logincont */\n    if (retID == ID) {             /* 단계 확인 없이 ID만 비교 */"
+        },
+        {
+          "kind": "fix",
+          "label": "Netatalk 커밋 c2ea1f4 발췌",
+          "lang": "c",
+          "code": "+enum dhx2_state { DHX2_STATE_IDLE, DHX2_STATE_EXPECT_CONT1, DHX2_STATE_EXPECT_CONT2 };\n+    if (dhx2_state != DHX2_STATE_EXPECT_CONT1 || Ra == NULL)\n+        return AFPERR_PARAM;           /* 순서 밖 continuation 거부 */\n+        dhx2_release_mpi(&Ra);         /* 해제하고 NULL로 */\n+        dhx2_state = DHX2_STATE_EXPECT_CONT2;\n-    if (retID == ID) {\n+    if (retID == ID && dhx2_state == DHX2_STATE_EXPECT_CONT1) {"
+        }
+      ]
+    },
+    "deepDive": null
+  },
+  {
+    "cve": "CVE-2026-76466",
+    "date": "2026-11-21",
+    "grade": "red",
+    "title": "Cisco Expressway 클러스터 DB 서비스 고정 쿠키로 무인증 root RCE",
+    "product": "Cisco Expressway Series (Expressway-C, Expressway-E), VCS",
+    "summary": "Expressway 클러스터 데이터베이스 서비스가 모든 장비에 같은 영구 쿠키를 쓰고, 클러스터 TLS Verify Mode를 켜도 클라이언트 인증서를 실제로 검증하지 않는다. 쿠키를 아는 공격자는 DB 서비스에 붙어 RPC로 root 명령을 실행한다. 10/21 공개, PoC 공개 직후 악용 보고, 11/20 CISA KEV 등재.",
+    "cvss": 9.8,
+    "kev": true,
+    "poc": true,
+    "tags": [
+      "cisco",
+      "expressway",
+      "vcs",
+      "hard-coded-credentials",
+      "rce",
+      "cwe-798",
+      "cluster"
+    ],
+    "links": [
+      {
+        "label": "Cisco 보안 권고 cisco-sa-vcs-static-cred-hr7EWZ8t",
+        "url": "https://sec.cloudapps.cisco.com/security/center/content/CiscoSecurityAdvisory/cisco-sa-vcs-static-cred-hr7EWZ8t"
+      },
+      {
+        "label": "CISA KEV 추가 공지 (11/20)",
+        "url": "https://www.cisa.gov/news-events/alerts/2026/11/20/cisa-adds-four-known-exploited-vulnerabilities-catalog"
+      },
+      {
+        "label": "SecurityWeek: PoC 공개 직후 악용",
+        "url": "https://www.securityweek.com/hackers-exploit-cisco-expressway-vulnerability-soon-after-poc-release/"
+      },
+      {
+        "label": "Security Affairs: 러시아 기관 침해에 악용",
+        "url": "https://securityaffairs.com/203598/hacking/hackers-exploit-cisco-expressway-flaw-cve-2026-76466-to-breach-russian-organization.html"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-76466"
+      },
+      {
+        "label": "CVE.org",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-76466"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "Expressway 클러스터 피어끼리 설정을 복제하는 데이터베이스 서비스의 인증이 두 겹으로 깨졌다. 첫째, 피어 인증에 쓰는 쿠키가 장비별로 생성되지 않고 펌웨어에 고정된 영구 값이라(CWE-798) 같은 버전 이미지를 가진 누구나 안다. 둘째, 클러스터링의 TLS Verify Mode를 Enabled로 둬도 클라이언트 인증서 검증이 실제로 수행되지 않아 상호 TLS가 두 번째 방어선 역할을 못 한다. 결과적으로 서비스가 신뢰하는 피어의 정체가 공용 비밀 하나로 축소되고, 그 서비스가 노출하는 RPC 중에 root 권한으로 OS 명령을 실행하는 경로가 있다. 쿠키 메커니즘의 구현(어느 런타임의 분산 쿠키인지)은 벤더가 밝히지 않았다.",
+      "trigger": "원격, 무인증. 공격자가 Expressway의 클러스터 데이터베이스 서비스 포트에 네트워크로 도달할 수 있으면 된다. 클러스터 구성 여부와 무관하게 서비스가 열려 있는지가 관건(추정). Expressway-E는 DMZ에 놓여 인터넷에 노출되는 경우가 많아 위험이 크다.",
+      "exploitation": "실제 악용됨, PoC 공개. 고정 쿠키로 DB 서비스에 피어처럼 접속한 뒤 특정 RPC를 호출해 root 명령 실행까지 바로 간다. 메모리 손상이 아닌 논리 결함이라 안정적이고 자동화가 쉽다. 보도에 따르면 PoC 공개 후 짧은 시간 안에 악용이 시작됐고 러시아 기관 침해 사례가 보고됐다.",
+      "patch": "Cisco는 우회책이 없다고 밝혔고 고정 릴리스로 업그레이드가 유일한 조치다. 보도 기준 X15.5.20 등 Unified Communications 하드닝 릴리스. 정확한 버전 표는 권고문 확인 필요. 패치 후에도 노출 기간 동안의 침해 여부 점검이 필요하다.",
+      "detection": "외부나 비클러스터 주소에서 클러스터 DB 서비스 포트로 들어온 연결, Expressway에서 root로 생성된 예상 밖 셸이나 프로세스, 설정 데이터베이스의 비정상 변경. 공개 PoC 저장소에 탐지용 스크립트가 함께 있다는 보도가 있으나 직접 확인 못 함.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "재구성, 실제 소스 아님 (벤더 설명 기반 추정)",
+          "lang": "python",
+          "code": "CLUSTER_COOKIE = \"<펌웨어에 고정된 값>\"   # 모든 장비가 같은 값\n\ndef accept_peer(conn):\n    # TLS Verify Mode=Enabled여도 클라이언트 인증서를 보지 않음\n    if conn.recv_cookie() == CLUSTER_COOKIE:\n        return trusted_rpc_session(conn)   # root로 도는 RPC 전체 허용"
+        },
+        {
+          "kind": "fix",
+          "label": "재구성, 실제 소스 아님 (수정 방향)",
+          "lang": "python",
+          "code": "def accept_peer(conn):\n    cert = conn.peer_cert()\n    if not verify_chain(cert, cluster_ca) or cert.subject not in cluster_peers:\n        raise AuthError   # 상호 TLS로 피어 신원 확인\n    if not hmac_eq(conn.recv_cookie(), per_install_secret()):\n        raise AuthError   # 설치마다 생성한 비밀"
         }
       ]
     },
