@@ -112,5 +112,11 @@
     "note": "CISA KEV 11/20 신규 4건: Cisco Expressway 클러스터 DB 고정 쿠키 root RCE(PoC 공개 후 악용), SAP NetWeaver Portal JNDI 속성 주입(2025년 패치), vCenter vmdir 인증 우회(ARMORY CASTLE 제로데이, red 상향), Apache Roller(KEV 반영). pip 번들 certifi의 침해된 eMudhra 루트(26.2.2 수정), Netatalk DHX2 상태 머신 재진입 UAF.",
     "count": 4,
     "deepDive": null
+  },
+  {
+    "date": "2026-11-22",
+    "note": "CISA KEV 신규 없음(11/20 이후). AMD Zen1/Zen+ PSP 부트 ROM 서명 검증 결함(수정 불가, Google PoC 어드바이저리), AMD RAID Windows 드라이버 커널 읽기(대부분 수정 계획 없음, BYOVD 관점). Fastify middie와 fastify-express 경로 해석 불일치 미들웨어 우회 묶음, rclone sftp auth-proxy 캐시 키 인증 혼동. Apple CVE-2026-112487 iOS 영향 추가.",
+    "count": 5,
+    "deepDive": null
   }
 ]

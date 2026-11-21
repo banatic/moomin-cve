@@ -1150,7 +1150,7 @@
     "date": "2026-11-04",
     "grade": "orange",
     "title": "macOS revisiond 하드링크 경유 로컬 권한 상승",
-    "product": "macOS 15.8.2, 26.7.2, 27.2 미만",
+    "product": "macOS 15.8.2, 26.7.2, 27.2 미만, iOS와 iPadOS 26.7.2, 27.2 미만",
     "summary": "root 데몬 revisiond의 XPC가 일반 사용자에게 열려 있고, 스테이징 경로 처리가 하드링크를 따라가 root 소유 파일을 덮어쓸 수 있어. 11/3 연구자 PoC가 GitHub에 공개된 게 보도됐어. 악용 보고는 확인 못 했어.",
     "cvss": 7.8,
     "kev": false,
@@ -1170,9 +1170,18 @@
       {
         "label": "NVD",
         "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-112487"
+      },
+      {
+        "label": "Apple 권고 149521 (iOS 27.2 계열)",
+        "url": "https://support.apple.com/en-us/149521"
       }
     ],
-    "history": [],
+    "history": [
+      {
+        "date": "2026-11-22",
+        "note": "CVE 레코드 갱신(11/21 UTC): 영향 범위에 iOS와 iPadOS 26.7.2, 27.2 수정이 추가되고 Apple 권고 링크 3건(149521, 149522, 149523) 추가. 악용 표기는 없음."
+      }
+    ],
     "detail": {
       "rootCause": "com.apple.revisiond는 문서 버전 기능을 담당하는 root LaunchDaemon인데, XPC 리스너에 호출자 권한 게이트가 없어 일반 로컬 사용자가 접속돼. 문서 스테이징은 예측 가능한 임시 이름을 쓰고, 데몬이 안전 플래그 없이 하드링크 대상에 copyfile을 호출해. 권한 있는 프로세스가 사용자 제어 경로를 그대로 믿는 클래식 confused deputy 패턴이고, root 소유 유지와 스테이징 폴더의 상속 ACL이 겹치면서 시스템 파일 수정까지 이어져.",
       "trigger": "로컬, 표준 사용자 권한.",
@@ -4479,6 +4488,80 @@
     "deepDive": null
   },
   {
+    "cve": "CVE-2026-129504",
+    "date": "2026-11-22",
+    "grade": "green",
+    "title": "@fastify/express 플러그인 prefix와 마운트 경로 문자열 연결로 인증 미들웨어 무음 우회",
+    "product": "@fastify/express 4.0.0 ~ 4.0.9",
+    "summary": "@fastify/express가 경로 한정 Express 미들웨어의 마운트 경로를 플러그인 prefix에 단순 문자열 연결로 붙여, prefix가 슬래시로 끝나거나 마운트 경로가 슬래시로 시작하지 않으면 Express가 절대 매칭하지 못하는 경로가 된다. Fastify 라우터는 핸들러를 그대로 실행하므로 인증 미들웨어가 조용히 빠진다. 특수 요청도 비기본 설정도 필요 없다. 4.0.10 수정, 같은 릴리스에서 CVE-2026-133120, CVE-2026-124626, CVE-2026-133867도 같은 계열로 고쳐졌다.",
+    "cvss": 9.1,
+    "kev": false,
+    "poc": false,
+    "tags": [
+      "fastify",
+      "express",
+      "nodejs",
+      "parser-differential",
+      "middleware-bypass",
+      "auth-bypass",
+      "cwe-436",
+      "cwe-863"
+    ],
+    "links": [
+      {
+        "label": "GitHub 권고 GHSA-f44m-4qwg-5587",
+        "url": "https://github.com/fastify/fastify-express/security/advisories/GHSA-f44m-4qwg-5587"
+      },
+      {
+        "label": "fastify/fastify-express 커밋 e552017",
+        "url": "https://github.com/fastify/fastify-express/commit/e552017d83477761a9eb1df0ef6834d57cb1de61"
+      },
+      {
+        "label": "GHSA-w877-hjcp-88rc (CVE-2026-133120, 디코딩과 asterisk-form 불일치)",
+        "url": "https://github.com/fastify/fastify-express/security/advisories/GHSA-w877-hjcp-88rc"
+      },
+      {
+        "label": "GHSA-662w-h4p6-jq4p (CVE-2026-124626, 빈 세그먼트)",
+        "url": "https://github.com/fastify/fastify-express/security/advisories/GHSA-662w-h4p6-jq4p"
+      },
+      {
+        "label": "GHSA-84w6-xrf3-f8q8 (CVE-2026-133867, 파라미터 prefix와 RegExp 마운트)",
+        "url": "https://github.com/fastify/fastify-express/security/advisories/GHSA-84w6-xrf3-f8q8"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-129504"
+      },
+      {
+        "label": "CVE.org",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-129504"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "index.js의 use(path, fn)은 플러그인 prefix(this.prefix)와 마운트 경로를 prefix + path로 이어 붙이고, path가 정확히 '/'일 때만 예외 처리했다. Fastify 자신은 prefix와 라우트를 이을 때 구분자를 정규화하므로, 같은 선언이 라우터 쪽에서는 정상 경로가 되고 Express 쪽에서는 이중 슬래시 경로나 구분자 없이 붙은 경로가 된다. 그러면 Express는 매칭 실패로 next()를 부르고 Fastify는 핸들러를 실행한다. 깨진 불변식은 'Fastify가 서비스하는 경로와 Express 마운트 경로는 같은 문자열이다'이고, CWE-436 해석 불일치에 CWE-863 인가 누락이 겹친다. 이건 공격자 입력이 아니라 개발자의 평범한 표기에서 생기는 설정형 결함이라는 점이 특징이다.",
+      "trigger": "원격, 무인증. 앱이 prefix가 붙은 플러그인 안에서 경로 한정 Express 미들웨어로 인증이나 인가를 걸었고, prefix가 슬래시로 끝나거나 마운트 경로가 슬래시 없이 시작하면 된다. 요청 조작 불필요.",
+      "exploitation": "이론상 가능. 평범한 요청이 그냥 보호 없이 핸들러에 도달하므로 '익스플로잇'이라기보다 처음부터 보호가 꺼져 있던 상태다. 영향은 미들웨어가 지키던 자원에 따라 다르다.",
+      "patch": "4.0.10(커밋 e552017 등): middie 9.3.6에서 쓰던 joinPrefix()를 이식해, prefix가 슬래시로 끝나면 path의 앞 슬래시를 떼고 양쪽 다 슬래시가 없으면 넣는다. 배열 마운트에도 적용. 같은 릴리스에서 RegExp 마운트를 prefix 뒤에서 선형 시간으로 매칭하도록 바꿨고(이전 lazy 래핑은 경로 길이에 대해 이차 시간), 4.0.11은 플러그인 로드 후 추가된 미들웨어 적용 문제를 고쳤다. 업그레이드 후에도 핸들러 수준 권한 확인을 두는 게 안전하다.",
+      "detection": "코드 점검이 가장 확실하다. fastify.use 또는 app.use 호출의 마운트 경로와 register의 prefix 표기를 확인하고, 보호 경로에 인증 헤더 없는 200 응답이 있는지 액세스 로그를 본다. 공개 IOC 없음.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "fastify/fastify-express e552017의 부모, index.js 발췌",
+          "lang": "js",
+          "code": "function use (path, fn) {\n  const prefix = this.prefix\n  if (typeof path === 'string') {\n    // '/'만 예외, 나머지는 단순 연결 -> 이중 슬래시 또는 구분자 누락\n    path = prefix + (path === '/' && prefix.length > 0 ? '' : path)"
+        },
+        {
+          "kind": "fix",
+          "label": "fastify/fastify-express 커밋 e552017 발췌",
+          "lang": "js",
+          "code": "+function joinPrefix (prefix, path) {\n+  if ((path === '/' && prefix.length > 0) || (path[0] === '/' && prefix.endsWith('/'))) {\n+    path = path.slice(1)          // prefix가 구분자 제공\n+  } else if (path[0] !== '/' && !prefix.endsWith('/')) {\n+    path = '/' + path             // 구분자 보충\n+  }\n+  return prefix + path            // Fastify 라우트 결합 방식과 일치"
+        }
+      ]
+    },
+    "deepDive": null
+  },
+  {
     "cve": "CVE-2026-129956",
     "date": "2026-11-17",
     "grade": "green",
@@ -4836,6 +4919,72 @@
     "deepDive": null
   },
   {
+    "cve": "CVE-2026-133250",
+    "date": "2026-11-22",
+    "grade": "green",
+    "title": "@fastify/middie 경로 해석 불일치로 경로 한정 미들웨어 우회",
+    "product": "@fastify/middie 9.3.7 이하 (Fastify 미들웨어 엔진)",
+    "summary": "middie가 경로 한정 미들웨어를 매칭할 때 쓰는 path-to-regexp와 실제 라우팅을 하는 find-my-way가 같은 요청 경로를 다르게 해석해, 라우터는 보호된 핸들러로 보내는데 인증, 인가, 속도 제한 미들웨어는 건너뛴다. 빈 파라미터나 와일드카드 값, 슬래시로 시작하지 않는 요청 대상, 마운트 경로의 리터럴 % 세 가지가 원인이다. 9.3.8 수정. 같은 날 @fastify/express에서도 같은 계열 4건이 나왔다.",
+    "cvss": 9.1,
+    "kev": false,
+    "poc": false,
+    "tags": [
+      "fastify",
+      "nodejs",
+      "parser-differential",
+      "middleware-bypass",
+      "auth-bypass",
+      "path-normalization",
+      "cwe-436",
+      "cwe-288"
+    ],
+    "links": [
+      {
+        "label": "GitHub 권고 GHSA-gcf6-j9m3-p97x",
+        "url": "https://github.com/fastify/middie/security/advisories/GHSA-gcf6-j9m3-p97x"
+      },
+      {
+        "label": "fastify/middie 커밋 6073bd6",
+        "url": "https://github.com/fastify/middie/commit/6073bd6277630408eb767bcff434183675ca7ba9"
+      },
+      {
+        "label": "OpenJS CNA 권고 목록",
+        "url": "https://cna.openjsf.org/security-advisories.html"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-133250"
+      },
+      {
+        "label": "CVE.org",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-133250"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "Fastify는 라우팅을 find-my-way로 하고, middie는 use(path, fn)로 마운트된 미들웨어를 path-to-regexp로 만든 정규식으로 별도 매칭한다. 같은 URL을 두 파서가 해석하므로 둘이 다르게 판단하는 순간 '핸들러가 실행되면 그 경로의 미들웨어도 실행된다'는 불변식이 깨진다(CWE-436 해석 불일치, CWE-288 대체 경로 인증 우회). 커밋 6073bd6 메시지에 따르면 세 가지 불일치가 있었다. find-my-way는 파라미터와 와일드카드에 빈 값을 허용하지만 path-to-regexp는 최소 한 글자를 요구했다. find-my-way는 슬래시로 시작하지 않는 경로의 첫 글자를 건너뛰는데 middie는 그런 경로를 그대로 매칭했다. find-my-way는 리터럴 %를 %25로 저장하고 요청 경로의 %25를 유지하는데 middie는 %25를 한 번 더 디코딩했다(lib/engine.js의 decodeNestedPercentEncodedBytes).",
+      "trigger": "원격, 무인증. Fastify 앱이 middie(또는 이를 쓰는 @fastify/express 이전 구조)로 경로 한정 미들웨어에 인증이나 인가를 걸어 두고, 같은 패턴에 동적 세그먼트나 와일드카드가 있거나 마운트 경로에 %가 들어 있으면 된다. 별도 설정 불필요.",
+      "exploitation": "이론상 가능(공개 PoC 확인 못 함). 프리미티브는 '미들웨어 없이 핸들러 실행' 하나이고, 영향은 그 미들웨어가 무엇을 지키고 있었는지(세션 확인, 테넌트 격리, 속도 제한)에 따라 달라진다. 핸들러 자체에 권한 확인이 따로 있으면 영향이 줄어든다.",
+      "patch": "9.3.8(커밋 6073bd6): 마운트 경로를 parse한 뒤 param과 wildcard 토큰을 optional group으로 감싸는 allowEmptyValues를 추가해 빈 값도 매칭되게 했다. 슬래시로 시작하지 않는 요청 대상은 절대형 URL이 아니면 400(FST_ERR_MIDDIE_MALFORMED_URL)으로 거부하고 '*' 단독만 루트로 취급한다. 마운트 경로의 %를 %25로 바꾸고 이중 디코딩을 제거했다. 9.3.9는 플러그인 로드 후 추가된 미들웨어 적용 문제를 이어서 고쳤다. 근본적으로는 라우터와 미들웨어 매처가 두 개인 구조 자체가 위험하므로 핸들러에도 preHandler 훅으로 권한 확인을 두는 게 안전하다.",
+      "detection": "패치 후에는 형식이 이상한 요청이 400으로 거부되므로 400 급증이 우회 시도 흔적이 될 수 있다. 패치 전에는 액세스 로그에서 빈 경로 세그먼트(연속 슬래시)나 슬래시로 시작하지 않는 요청 대상으로 보호 경로에 200이 난 기록을 찾는다. 공개 IOC 없음.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "fastify/middie 6073bd6의 부모, lib/engine.js 발췌",
+          "lang": "js",
+          "code": "const pathRegExp = pathToRegexp(sanitizeMountPath(spec, ignoreDuplicateSlashes), {\n  end: false   // :id, * 에 빈 값이 오면 매칭 실패, 라우터는 통과\n})\n// 요청 경로의 %25XX를 한 번 더 디코딩, find-my-way와 다르게 봄\npath = decodeNestedPercentEncodedBytes(path)\nif (schemeEnd === -1) return url   // 슬래시 없는 대상도 그대로 매칭"
+        },
+        {
+          "kind": "fix",
+          "label": "fastify/middie 커밋 6073bd6 발췌",
+          "lang": "js",
+          "code": "+const pathRegExp = pathToRegexp(allowEmptyValues(sanitizeMountPath(spec, ignoreDuplicateSlashes)), {\n+    if (token.type === 'param' || token.type === 'wildcard') {\n+      return { type: 'group', tokens: [token] }   // 빈 값도 매칭\n+  url = url.replaceAll('%', '%25')                 // find-my-way와 같은 표기\n-  path = decodeNestedPercentEncodedBytes(path)\n+    const absolutePath = path === '*' ? '/' : getPathFromAbsoluteUrl(path)\n-  if (schemeEnd === -1) return url\n+  if (schemeEnd === -1) return null               // 400으로 거부"
+        }
+      ]
+    },
+    "deepDive": null
+  },
+  {
     "cve": "CVE-2026-133323",
     "date": "2026-11-20",
     "grade": "orange",
@@ -4953,6 +5102,75 @@
           "label": "pypa/pip 커밋 922f23e (PR 14371) 발췌",
           "lang": "diff",
           "code": "# src/pip/_vendor/certifi/__init__.py\n-__version__ = \"2026.07.22\"\n+__version__ = \"2026.10.18\"\n# src/pip/_vendor/certifi/cacert.pem  (104줄 삭제)\n-# Label: \"emSign Root CA - G1\"\n-# Label: \"emSign ECC Root CA - G3\"\n-# Label: \"emSign Root CA - C1\"\n-# Label: \"emSign ECC Root CA - C3\""
+        }
+      ]
+    },
+    "deepDive": null
+  },
+  {
+    "cve": "CVE-2026-134352",
+    "date": "2026-11-22",
+    "grade": "green",
+    "title": "rclone serve sftp auth-proxy 캐시 키에 인증 방식 누락, 공개키를 비밀번호로 재사용",
+    "product": "rclone 1.51.0 이상 1.76.0 미만 (serve sftp --auth-proxy)",
+    "summary": "auth-proxy가 만든 백엔드 캐시를 사용자, 자격 증명 해시, 클라이언트 IP로만 키를 만들고 자격 증명 종류(비밀번호인지 공개키인지)는 넣지 않았다. 공개키는 비밀이 아니므로 피해자가 공개키로 로그인한 뒤 같은 IP에서 그 base64 공개키를 비밀번호로 보내면 캐시 적중으로 읽기 쓰기 VFS를 얻는다. 같은 권고의 두 번째 수정은 서명 없는 공개키 제시만으로 프록시가 실행되던 문제다. 1.76.0 수정.",
+    "cvss": 9.2,
+    "kev": false,
+    "poc": false,
+    "tags": [
+      "rclone",
+      "sftp",
+      "ssh",
+      "auth-bypass",
+      "cache-key",
+      "golang",
+      "cwe-287"
+    ],
+    "links": [
+      {
+        "label": "GitHub 권고 GHSA-66qv-66mg-9h74",
+        "url": "https://github.com/rclone/rclone/security/advisories/GHSA-66qv-66mg-9h74"
+      },
+      {
+        "label": "rclone 커밋 f6ca72f (캐시 키에 kind 추가)",
+        "url": "https://github.com/rclone/rclone/commit/f6ca72fabb09c1340c4a42bb15a3cbdc90b3b6e5"
+      },
+      {
+        "label": "rclone 커밋 866e7ac (VerifiedPublicKeyCallback로 이동)",
+        "url": "https://github.com/rclone/rclone/commit/866e7ac577aa51f680f6796077ea1d0363e0be15"
+      },
+      {
+        "label": "VulnCheck 권고",
+        "url": "https://www.vulncheck.com/advisories/rclone-1.51.0-before-1.76.0-authentication-bypass-via-serve-sftp-auth-proxy-cache"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-134352"
+      },
+      {
+        "label": "CVE.org",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-134352"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "cmd/serve/proxy/proxy.go의 Proxy.call(user, auth, kind, clientIP)은 외부 프록시 프로그램이 돌려준 설정으로 VFS 백엔드를 만들고 vfsCache에 넣는데, 키를 generateCacheKey(user, auth, clientIP)로 만들었다. auth는 비밀번호일 수도 공개키 바이트일 수도 있는데 kind가 키에 빠져 있어서, 공개키 로그인으로 만든 항목과 '같은 문자열을 비밀번호로 보낸' 요청이 같은 키가 된다. 캐시 적중 시 프록시 프로그램을 다시 묻지 않으므로 비밀번호를 전부 거부하는 프록시도 우회된다. 깨진 불변식은 '캐시 적중은 원래 인증과 같은 종류, 같은 강도의 증명에만 허용된다'이고, 비밀이 아닌 값을 비밀처럼 캐시 키에 쓴 인증 혼동(CWE-287)이다. 별도 커밋 866e7ac는 프록시 호출이 PublicKeyCallback에 있어서 서명 없이 키만 제시해도(SSH의 'query' 단계) 프록시가 실행되고 캐시가 채워지던 문제를 고쳤고, 둘을 합치면 피해자 로그인 없이도 공격자 IP에서 캐시를 미리 채울 수 있었다.",
+      "trigger": "원격. rclone serve sftp를 --auth-proxy로 운영하고 공개키 인증을 허용하는 경우. 원래 결함만으로는 피해자의 공개키(대개 공개 정보)와 같은 클라이언트 IP(NAT 공유 등), 캐시 수명 안이라는 조건이 필요하다. 866e7ac 결함과 결합하면 IP 조건이 공격자 자신의 IP로 바뀐다.",
+      "exploitation": "이론상 가능(공개 PoC 확인 못 함). 결과는 피해자 사용자로 SFTP VFS 읽기 쓰기 권한. 백엔드가 클라우드 스토리지면 그 자격 증명으로 접근하는 셈이다.",
+      "patch": "1.76.0. f6ca72f는 generateCacheKey에 kind 바이트를 HMAC 입력으로 먼저 넣고, cacheEntry에 kind 필드를 둬 적중 시에도 확인한다. 866e7ac는 프록시 호출을 VerifiedPublicKeyCallback으로 옮겨 클라이언트가 개인키로 서명한 뒤에만 실행되게 했고, PublicKeyCallback은 프록시 모드에서 빈 Permissions만 돌려준다. 같은 시기 9aba8e4는 프록시 거부가 5분 안에 반영되게 했다. 임시 완화는 auth-proxy 사용 중이면 공개키 인증을 끄거나 업그레이드.",
+      "detection": "rclone 디버그 로그(-vv)의 'Public key login attempt'와 이어지는 비밀번호 로그인이 같은 사용자, 같은 IP로 짧은 간격에 나오는지, 그리고 비밀번호 로그인 시 프록시 프로그램 실행 로그가 없는지(캐시 적중) 본다. 프록시 프로그램 쪽에서 pass 필드에 ssh-ed25519 등 공개키 형식 문자열이 들어오는지도 지표가 된다.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "rclone f6ca72f의 부모, cmd/serve/proxy/proxy.go 발췌",
+          "lang": "go",
+          "code": "func generateCacheKey(user, auth, clientIP string) string {\n\tmac := hmac.New(sha256.New, cacheKeyHMACKey)\n\tmac.Write([]byte(auth))   // 비밀번호든 공개키든 같은 auth로 취급\n\t...\n}\ncacheKey := generateCacheKey(user, auth, clientIP)  // kind 누락"
+        },
+        {
+          "kind": "fix",
+          "label": "rclone 커밋 f6ca72f, 866e7ac 발췌",
+          "lang": "go",
+          "code": "+func generateCacheKey(user, auth string, kind authKind, clientIP string) string {\n+\tmac.Write([]byte{byte(kind)})   // 자격 증명 종류를 키에 포함\n+\tkind      authKind              // 적중 시 종류도 확인\n // 866e7ac: 서명 검증 뒤에만 프록시 실행\n+\tVerifiedPublicKeyCallback: func(c ssh.ConnMetadata, pubKey ssh.PublicKey, perms *ssh.Permissions, _ string) (*ssh.Permissions, error) {"
         }
       ]
     },
@@ -5140,6 +5358,64 @@
           "label": "안전한 파서 설정 (재구성, 실제 소스 아님)",
           "lang": "Java",
           "code": "f.setFeature(\"http://apache.org/xml/features/disallow-doctype-decl\", true); // DTD 금지\nf.setFeature(\"http://xml.org/sax/features/external-general-entities\", false);\nf.setXIncludeAware(false);\nf.setExpandEntityReferences(false);"
+        }
+      ]
+    },
+    "deepDive": null
+  },
+  {
+    "cve": "CVE-2026-28235",
+    "date": "2026-11-22",
+    "grade": "green",
+    "title": "AMD RAID 설정 드라이버 주소 검증 누락으로 관리자에서 커널 메모리 임의 읽기",
+    "product": "AMD RAID Windows 드라이버 (RAIDXpert2 계열, Ryzen 4000 모바일, 7020, 7035, 7040, Athlon 3000 모바일 등, 대부분 수정 계획 없음, 7045 계열은 9.3.3.329 이상)",
+    "summary": "AMD RAID 구성용 Windows 커널 드라이버가 사용자 모드가 넘긴 주소를 검증하지 않아, 관리자 권한 공격자가 커널 메모리를 임의로 읽을 수 있다. 다수 제품군이 'No fix planned'라 서명된 취약 드라이버가 계속 유통된다는 점에서 BYOVD 관점으로 볼 만하다.",
+    "cvss": 6.7,
+    "kev": false,
+    "poc": false,
+    "tags": [
+      "amd",
+      "windows",
+      "kernel-driver",
+      "byovd",
+      "raid",
+      "ioctl",
+      "info-leak",
+      "cwe-497"
+    ],
+    "links": [
+      {
+        "label": "AMD-SB-7067 AMD RAIDXpert2 Vulnerability",
+        "url": "https://www.amd.com/en/resources/product-security/bulletin/amd-sb-7067.html"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-28235"
+      },
+      {
+        "label": "CVE.org",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-28235"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "CVE 레코드는 AMD RAID Configuration Driver의 'improper address validation'으로 커널 메모리 임의 읽기가 가능하다고만 적었다(CWE-497). 이런 구성 드라이버는 보통 관리 앱(RAIDXpert2)이 DeviceIoControl로 버퍼를 넘기면 드라이버가 그 안의 주소나 오프셋으로 메모리를 복사해 돌려주는 구조인데, 주소가 드라이버 소유 버퍼 범위 안인지 확인하지 않으면 임의 커널 주소 읽기가 된다(추정). 정확한 IOCTL 코드, 드라이버 파일명, 디바이스 객체 ACL은 이 실행에서 확인한 공개 자료에 없다.",
+      "trigger": "로컬, 관리자 권한 필요(AMD 표기). 드라이버가 설치된 시스템이거나, 공격자가 서명된 취약 버전을 직접 로드할 수 있는 경우(BYOVD).",
+      "exploitation": "이론상 가능. 관리자에서 커널 읽기 프리미티브는 그 자체로 경계 상승이 작아 보이지만, EDR 콜백 배열이나 토큰 주소를 찾아내는 정보 누출 단계로 BYOVD 도구에서 흔히 쓰인다. 쓰기 프리미티브는 언급되지 않았다.",
+      "patch": "Ryzen 7045 모바일 계열만 RAID Windows Driver 9.3.3.329 이상으로 수정 표기, 나머지 다수는 No fix planned. 완화는 RAID를 쓰지 않는 PC에서 드라이버 제거, Microsoft 취약 드라이버 차단 목록(HVCI, WDAC) 갱신 여부 확인.",
+      "detection": "Sysmon 이벤트 6(드라이버 로드)과 Microsoft-Windows-Kernel-PnP, Code Integrity 로그(Microsoft-Windows-CodeIntegrity/Operational)에서 AMD RAID 드라이버가 RAID 미사용 장치에 새로 로드되는지 확인. 공개 IOC나 해시는 없음.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "재구성, 실제 소스 아님, 추정",
+          "lang": "c",
+          "code": "case IOCTL_RAID_READ_MEM:            /* 이름은 가상 */\n    req = Irp->AssociatedIrp.SystemBuffer;\n    RtlCopyMemory(req->out, (PVOID)req->addr, req->len);\n    /* addr가 드라이버 소유 범위인지 확인 없음 -> 임의 커널 읽기 */"
+        },
+        {
+          "kind": "fix",
+          "label": "재구성, 실제 소스 아님, 추정",
+          "lang": "c",
+          "code": "if (req->addr < ctx->base || req->len > ctx->size ||\n    req->addr - ctx->base > ctx->size - req->len)\n    return STATUS_INVALID_PARAMETER;   /* 자기 버퍼 밖은 거부 */\nRtlCopyMemory(req->out, (PVOID)req->addr, req->len);"
         }
       ]
     },
@@ -5442,6 +5718,73 @@
           "label": "Netatalk 커밋 c2ea1f4 발췌",
           "lang": "c",
           "code": "+enum dhx2_state { DHX2_STATE_IDLE, DHX2_STATE_EXPECT_CONT1, DHX2_STATE_EXPECT_CONT2 };\n+    if (dhx2_state != DHX2_STATE_EXPECT_CONT1 || Ra == NULL)\n+        return AFPERR_PARAM;           /* 순서 밖 continuation 거부 */\n+        dhx2_release_mpi(&Ra);         /* 해제하고 NULL로 */\n+        dhx2_state = DHX2_STATE_EXPECT_CONT2;\n-    if (retID == ID) {\n+    if (retID == ID && dhx2_state == DHX2_STATE_EXPECT_CONT1) {"
+        }
+      ]
+    },
+    "deepDive": null
+  },
+  {
+    "cve": "CVE-2026-74127",
+    "date": "2026-11-22",
+    "grade": "orange",
+    "title": "AMD Zen1/Zen+ PSP 부트 ROM 서명 검증 결함, SPI 플래시 경유 PSP 임의 코드 실행",
+    "product": "AMD EPYC 7001 (Naples), EPYC Embedded 3000 (Zen1/Zen+ Zeppelin 다이), 수정 계획 없음",
+    "summary": "PSP(Platform Security Processor) 마스크 ROM의 부트로더가 SPI 플래시에서 읽은 펌웨어의 서명을 제대로 검증하지 못해, 플래시를 쓸 수 있는 공격자가 PSP 최고 권한으로 서명 안 된 코드를 실행할 수 있다. ROM이라 패치가 불가능하고 AMD는 수정 계획 없음으로 표기했다. Google security-research가 'Zen 1 PSP bootrom exploit' 어드바이저리를 공개했다.",
+    "cvss": 9.4,
+    "kev": false,
+    "poc": true,
+    "tags": [
+      "amd",
+      "psp",
+      "bootrom",
+      "secure-boot",
+      "firmware",
+      "spi-flash",
+      "hardware",
+      "unpatchable",
+      "cwe-347"
+    ],
+    "links": [
+      {
+        "label": "AMD-SB-7075 Zen/Zen+ PSP boot ROM Signature Verification Vulnerability",
+        "url": "https://www.amd.com/en/resources/product-security/bulletin/amd-sb-7075.html"
+      },
+      {
+        "label": "Google security-research GHSA-7g3h-59cw-27vf (Zen 1 PSP bootrom exploit)",
+        "url": "https://github.com/google/security-research/security/advisories/GHSA-7g3h-59cw-27vf"
+      },
+      {
+        "label": "SecurityOnline 보도",
+        "url": "https://securityonline.info/cve-2026-74127-amd-psp-code-execution-poc/"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-74127"
+      },
+      {
+        "label": "CVE.org",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-74127"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "PSP는 x86 코어보다 먼저 깨어나는 ARM 기반 보안 코프로세서이고, 온칩 마스크 ROM의 1단계 부트로더가 SPI 플래시의 PSP 디렉터리에서 AMD 공개키와 PSP 부트로더 이미지를 읽어 RSA 서명을 검증한 뒤 실행한다. 이 체인이 x86 쪽 Platform Secure Boot와 SEV 신뢰의 뿌리다. CVE 레코드는 Zeppelin(Zen1/Zen+) 부트 ROM의 서명 검증이 부적절하다(CWE-347)고만 적고 있고, 어떤 비교나 파싱 단계가 틀렸는지는 이 실행에서 확인한 자료에 없다. 결과적으로 깨진 불변식은 'ROM이 다음 단계에 제어를 넘기기 전에 반드시 AMD 서명을 확인한다'이다. 같은 연구팀의 2025년 EntrySign(마이크로코드 서명에 CMAC를 해시처럼 쓴 문제)과는 별개의 ROM 결함이다.",
+      "trigger": "로컬, 그러나 사실상 물리 또는 펌웨어 쓰기 권한 필요. SPI 플래시에 임의 이미지를 쓸 수 있어야 한다(물리 프로그래머 클립, 또는 BMC나 OS에서 플래시 쓰기 보호를 뚫은 경우). 영향은 Zen1/Zen+ 서버와 임베디드 EPYC으로 AMD가 표기했다.",
+      "exploitation": "PoC 공개(Google 어드바이저리 기준, 이 실행에서 내용은 직접 확인 못 함). 개념적으로 변조 펌웨어가 PSP 최고 권한으로 실행되면 이후 부트 체인 전체(x86 BIOS 검증, SEV 키 관리, fTPM)를 공격자가 통제한다. 플래시에 남으므로 OS 재설치로 지워지지 않는 영속성이 된다. 원격에서 바로 이어지는 프리미티브는 아니다.",
+      "patch": "없음. 마스크 ROM이라 마이크로코드나 AGESA 업데이트로 고칠 수 없고, AMD는 EPYC 7001과 Embedded 3000 모두 'No fix planned'. 완화는 SPI 플래시 물리 접근 통제, BMC 펌웨어와 플래시 쓰기 보호 설정 점검, 해당 세대를 SEV 같은 기밀 컴퓨팅 신뢰 기반으로 쓰지 않는 것.",
+      "detection": "OS 수준 탐지는 사실상 불가능하다. 오프라인으로 SPI 플래시 덤프를 떠서 PSP 디렉터리 항목을 알려진 정상 이미지와 해시 비교하는 방식이 현실적이다(추정). 공개된 IOC 없음.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "재구성, 실제 소스 아님, 추정 (ROM 내부 로직 비공개)",
+          "lang": "c",
+          "code": "/* PSP 부트 ROM 1단계 (개념) */\nkey = load_amd_root_key(spi_dir);\nimg = load_psp_bootloader(spi_dir);\nif (verify_rsa(key, img) /* 이 검증이 특정 조건에서 성립하지 않음 */)\n    jump(img->entry);   /* 서명 안 된 코드가 PSP 최고 권한으로 실행 */"
+        },
+        {
+          "kind": "fix",
+          "label": "재구성, 실제 소스 아님 (ROM은 수정 불가, 운영 완화)",
+          "lang": "text",
+          "code": "# 하드웨어 수정 없음. 할 수 있는 것:\n# 1) SPI 플래시 물리 접근 차단, 섀시 개봉 감지\n# 2) BMC와 BIOS 플래시 쓰기 보호 설정 확인\n# 3) Zen1/Zen+ EPYC를 SEV 등 기밀 컴퓨팅 신뢰 기반으로 쓰지 않기"
         }
       ]
     },
