@@ -2856,6 +2856,14 @@
         "url": "https://github.com/GitoxideLabs/gitoxide/security/advisories/GHSA-xw69-xv93-5fjv"
       },
       {
+        "label": "GitoxideLabs/gitoxide 커밋 45bf9be",
+        "url": "https://github.com/GitoxideLabs/gitoxide/commit/45bf9be375a1916dc426b67c0c24a5f1b363b71b"
+      },
+      {
+        "label": "GitoxideLabs/gitoxide 커밋 24fb06a",
+        "url": "https://github.com/GitoxideLabs/gitoxide/commit/24fb06a4878af1c9c0c4ce205d3407c4875da4e7"
+      },
+      {
         "label": "VulnCheck 권고",
         "url": "https://www.vulncheck.com/advisories/gix-fs-before-0.24.1-ntlm-credential-disclosure-via-windows-symlink-unc-probe"
       },
@@ -2868,29 +2876,40 @@
         "url": "https://www.cve.org/CVERecord?id=CVE-2026-123532"
       }
     ],
-    "history": [],
+    "history": [
+      {
+        "date": "2026-11-23",
+        "note": "심층 설명. 재구성 코드를 실제 커밋 24fb06a, 45bf9be 발췌로 교체하고, 1차 수정이 직접 대상만 막고 링크 체인 경유는 2차 수정에서 막혔다는 점을 반영."
+      }
+    ],
     "detail": {
-      "rootCause": "Windows는 심볼릭 링크를 만들 때 CreateSymbolicLinkW에 SYMBOLIC_LINK_FLAG_DIRECTORY 여부를 정해야 해서, gix_fs::symlink::create가 대상 경로에 is_dir()(내부적으로 메타데이터 조회)를 호출해 종류를 판단했어. 저장소가 지정한 링크 대상이 UNC 경로면 이 메타데이터 조회가 원격 SMB 서버에 연결하고, Windows가 현재 사용자 자격으로 자동 NTLM 인증을 해. 신뢰할 수 없는 저장소 데이터(링크 대상 문자열)가 체크아웃 중 네트워크 접근으로 바뀌는 신뢰 경계 결함이야(CWE-59).",
-      "trigger": "원격, 사용자 상호작용. 피해자가 Windows에서 심볼릭 링크를 켠 상태로 조작된 저장소를 gitoxide 기반 도구로 체크아웃해야 해. 아웃바운드 SMB(445)가 막혀 있으면 안 됨.",
-      "exploitation": "PoC 공개(CISA ADP 표기). 얻는 건 사용자 이름, 도메인, NTLMv2 응답이라 오프라인 크래킹이나 릴레이 재료가 돼. 코드 실행은 아님.",
-      "patch": "gix-fs 0.24.1. 공개 diff는 직접 확인 못 했어. 방어 쪽에선 아웃바운드 445 차단이 이 계열 전체를 막는 가장 확실한 완화야.",
-      "detection": "Sysmon 이벤트 3(네트워크 연결)에서 git 계열 프로세스의 외부 445 연결, Microsoft-Windows-SMBClient 운영 로그, Security 4648(명시적 자격 증명 로그온 시도)이 지표야.",
+      "rootCause": "Windows의 CreateSymbolicLinkW는 링크를 만들 때 SYMBOLIC_LINK_FLAG_DIRECTORY 여부를 호출자가 정해야 해서, gix_fs::symlink::create는 링크 부모 디렉터리에 대상 문자열을 이어 붙인 경로에 is_dir()(대상을 따라가는 메타데이터 조회)를 불러 종류를 정했어. 링크 대상 문자열은 저장소 트리 안의 blob, 즉 신뢰할 수 없는 데이터인데, 이게 \\\\host\\share 같은 UNC나 NT 네임스페이스 경로면 조회 자체가 SMB 연결과 현재 사용자 자격의 자동 NTLM 인증을 일으켜. 1차 수정(커밋 24fb06a)은 Git for Windows의 compat/mingw.c process_phantom_symlink()를 따라 대상이 / 나 \\ 로 시작하면 조회 없이 파일 링크로 만들게 했어. 하지만 GHSA-xw69-xv93-5fjv의 핵심은 간접 경로야. 대상이 상대 경로여도 그 경로의 중간 컴포넌트나 마지막 컴포넌트가 같은 체크아웃에서 먼저 만들어진 다른 링크면, 대상을 따라가는 조회가 그 링크를 거쳐 원격 위치에 도달해. 검사는 원래 철자 한 번에만 적용되고 실제 해석은 링크 체인 전체를 따라가는, 검사와 사용 대상이 다른 신뢰 경계 결함이야(CWE-59).",
+      "trigger": "원격, 사용자 상호작용. 피해자가 Windows에서 core.symlinks가 켜진 상태(개발자 모드나 SeCreateSymbolicLinkPrivilege 필요)로 조작된 저장소를 gitoxide 기반 도구로 체크아웃해야 해. 아웃바운드 SMB(445)나 WebDAV 경로가 열려 있어야 자격 증명이 실제로 나가.",
+      "exploitation": "CISA ADP가 PoC 공개로 표기했어. 프리미티브는 체크아웃 시점의 강제 인증(coerced authentication)이고, 얻는 건 사용자 이름, 도메인, NTLMv2 챌린지 응답이야. 이걸로 오프라인 크래킹이나 다른 서비스로의 NTLM 릴레이를 시도할 수 있지만 그 자체로 코드 실행은 아니야. 체인 우회는 저장소 안에 원격을 가리키는 링크 하나와 그 링크를 경유하는 상대 경로 링크 하나를 두는 개념이야.",
+      "patch": "두 커밋으로 나뉘어. 24fb06a는 원래 철자가 구분자로 시작하면 조회를 건너뛰고, parent()가 없을 때 panic 대신 에러를 돌려줘. 45bf9be는 target_is_dir를 새로 만들어 경로를 컴포넌트 단위로 직접 해석해. 각 단계에서 symlink_metadata(따라가지 않는 조회)로 확인하고, 링크를 만나면 read_link로 대상을 읽어 다시 구분자 검사를 한 뒤 경로를 재조립해. Prefix가 Disk나 VerbatimDisk가 아니면(UNC, VerbatimUNC, DeviceNS) 즉시 파일로 판정하고, 해석 횟수는 40번으로 제한해 순환을 끊어. 커밋 메시지대로 확인 중 디렉터리가 동시에 바뀌지 않는다는 가정이 남아 있어(TOCTOU는 범위 밖). CVE 레코드 기준 수정 버전은 gix-fs 0.24.1이고, 11월 22일 릴리스 묶음에서 gix-fs 1.0.0이 나왔어. 완화책은 아웃바운드 445 차단, Windows 11 24H2 이상의 SMB 클라이언트 NTLM 차단(Set-SmbClientConfiguration -BlockNTLM), 신뢰하지 않는 저장소에서 core.symlinks 끄기야.",
+      "detection": "Sysmon 3(NetworkConnect)에서 git 계열 프로세스(gix.exe, ein.exe, 이를 내장한 도구)의 외부 445 연결이 가장 직접적인 지표야. NTLM 감사 정책(네트워크 보안: NTLM 제한: 원격 서버에 대한 나가는 NTLM 트래픽 = 모두 감사)을 켜면 Microsoft-Windows-NTLM/Operational 8001에 대상 서버와 호출 프로세스가 남아. ETW로 보면 Microsoft-Windows-SMBClient 프로바이더의 연결 이벤트와 Microsoft-Windows-Kernel-Network의 TCP 연결 시도 이벤트를 프로세스 ID로 묶으면 체크아웃 중 원격 접속을 잡을 수 있어. 파일 쪽은 Sysmon 11에서 체크아웃 디렉터리에 생긴 링크, 그리고 fsutil reparsepoint query로 대상이 \\\\ 로 시작하는 링크를 찾으면 돼.",
       "code": [
         {
           "kind": "vuln",
-          "label": "링크 종류 판단용 대상 조회 (재구성, 실제 소스 아님)",
+          "label": "GitoxideLabs/gitoxide 커밋 24fb06a 이전 gix-fs/src/symlink.rs 발췌",
           "lang": "Rust",
-          "code": "pub fn create(target: &Path, link: &Path) -> io::Result<()> {\n    if link.parent().unwrap().join(target).is_dir() { // UNC면 여기서 SMB 인증\n        std::os::windows::fs::symlink_dir(target, link)\n    } else { std::os::windows::fs::symlink_file(target, link) }\n}"
+          "code": "pub fn create(original: &Path, link: &Path) -> io::Result<()> {\n    // TODO: figure out if links to links count as files or whatever they point at\n    let orig_abs = link.parent().expect(\"dir for link\").join(original);\n    if orig_abs.is_dir() { // 대상을 따라가는 조회. UNC면 SMB 인증 발생\n        symlink_dir(original, link)\n    } else {\n        symlink_file(original, link)\n    }\n}"
         },
         {
           "kind": "fix",
-          "label": "원격 대상은 조회하지 않음 (재구성, 실제 소스 아님)",
+          "label": "GitoxideLabs/gitoxide 커밋 24fb06a 발췌 (1차, 직접 대상만)",
           "lang": "Rust",
-          "code": "if is_unc_or_remote(target) {\n    return std::os::windows::fs::symlink_file(target, link); // 네트워크 접근 없이 생성\n}"
+          "code": "// Git process_phantom_symlink() 와 같은 규칙: 원래 철자를 먼저 검사\nlet starts_with_slash =\n    matches!(original.as_os_str().as_encoded_bytes().first(), Some(b'/' | b'\\\\'));\nif !starts_with_slash && parent.join(original).is_dir() { // 체인 경유는 여전히 따라감\n    symlink_dir(original, link)\n} else { symlink_file(original, link) }"
+        },
+        {
+          "kind": "fix",
+          "label": "GitoxideLabs/gitoxide 커밋 45bf9be target_is_dir 발췌 (2차, 체인 전체)",
+          "lang": "Rust",
+          "code": "if let Component::Prefix(prefix) = component {\n    if !matches!(prefix.kind(), Prefix::Disk(_) | Prefix::VerbatimDisk(_)) {\n        return Ok(false); // UNC, DeviceNS 는 조회 안 함\n    }\n    continue;\n}\nlet meta = current.symlink_metadata()?; // 따라가지 않는 조회\nif meta.file_type().is_symlink() {\n    let target = std::fs::read_link(&current)?;\n    if starts_with_separator(&target) { return Ok(false); } // 체인 중간도 검사\n    current.pop();\n    path = current.join(target).join(components.as_path());\n    continue 'resolve; // 최대 40회\n}"
         }
       ]
     },
-    "deepDive": null
+    "deepDive": "2026-11-23"
   },
   {
     "cve": "CVE-2026-123890",
@@ -5171,6 +5190,134 @@
           "label": "rclone 커밋 f6ca72f, 866e7ac 발췌",
           "lang": "go",
           "code": "+func generateCacheKey(user, auth string, kind authKind, clientIP string) string {\n+\tmac.Write([]byte{byte(kind)})   // 자격 증명 종류를 키에 포함\n+\tkind      authKind              // 적중 시 종류도 확인\n // 866e7ac: 서명 검증 뒤에만 프록시 실행\n+\tVerifiedPublicKeyCallback: func(c ssh.ConnMetadata, pubKey ssh.PublicKey, perms *ssh.Permissions, _ string) (*ssh.Permissions, error) {"
+        }
+      ]
+    },
+    "deepDive": null
+  },
+  {
+    "cve": "CVE-2026-134793",
+    "date": "2026-11-23",
+    "grade": "green",
+    "title": "electerm Windows 폴더 크기 계산에서 유니코드 따옴표로 PowerShell 문자열 탈출",
+    "product": "electerm 5.9.0 미만 (Windows)",
+    "summary": "로컬 폴더 크기를 구할 때 경로를 PowerShell 작은따옴표 문자열에 넣고 ASCII 작은따옴표만 두 번 써서 이스케이프했어. PowerShell 파서는 U+2018, U+2019, U+201A, U+201B도 작은따옴표로 취급하니, 이름에 U+2019가 든 폴더가 리터럴을 닫고 나머지 이름을 코드로 실행시켜. 압축 파일, SMB 공유, WSL 배포판으로 그런 이름을 전달할 수 있어.",
+    "cvss": 7.8,
+    "kev": false,
+    "poc": false,
+    "tags": [
+      "windows",
+      "powershell",
+      "command-injection",
+      "unicode",
+      "electron"
+    ],
+    "links": [
+      {
+        "label": "GHSA-h4v2-5hq4-wc2g",
+        "url": "https://github.com/electerm/electerm/security/advisories/GHSA-h4v2-5hq4-wc2g"
+      },
+      {
+        "label": "electerm/electerm 커밋 488b112 (PR 4710)",
+        "url": "https://github.com/electerm/electerm/commit/488b112d10dc21545f18284d4eb52db6dafb7f31"
+      },
+      {
+        "label": "VulnCheck 권고",
+        "url": "https://www.vulncheck.com/advisories/electerm-before-5.9.0-os-command-injection-via-unicode-quotes-in-powershell"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-134793"
+      },
+      {
+        "label": "CVE.org",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-134793"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "src/app/lib/fs.js의 getFolderSizeWin은 폴더 경로를 escapePowerShellArg로 감싼 뒤 Get-ChildItem -Path '<경로>' 스크립트 문자열에 이어 붙여 runWinCmd로 실행했어. escapePowerShellArg는 ASCII 작은따옴표(U+0027)만 두 개로 바꿨는데, PowerShell 토크나이저는 U+2018, U+2019, U+201A, U+201B도 작은따옴표 구분자로 인정해. 그래서 이스케이프 함수가 가정한 문법(따옴표는 U+0027 하나)과 실제 파서 문법이 달라 인용이 깨지는 인젝션이야(CWE-78). 클라이언트 쪽 file-info-modal.jsx의 calcLocal 경로도 같은 패턴이었어.",
+      "trigger": "로컬, 사용자 상호작용. 피해자가 Windows에서 electerm 로컬 파일 패널로 공격자가 이름을 정한 폴더의 크기 계산(속성 보기)을 요청해야 해. 이름은 압축 해제, SMB 공유, WSL 배포판 파일 시스템 등으로 들어올 수 있어.",
+      "exploitation": "이론상 가능, 공개 PoC는 확인 못 했어. 폴더 이름의 나머지가 PowerShell 코드로 해석돼 electerm 사용자 권한의 임의 명령 실행이 돼. 권한 상승은 없고, 폴더 이름 길이와 금지 문자 제약 안에서만 표현할 수 있어(추정).",
+      "patch": "5.9.0. 이스케이프를 고치는 대신 구조를 바꿨어. 경로를 UTF-8 base64로 인코딩해 스크립트에 넣고, 스크립트 안에서 FromBase64String으로 복원해 -LiteralPath로 넘겨. 경로 문자가 PowerShell 파서를 한 번도 거치지 않으니 따옴표 변종 문제 전체가 사라지고, -LiteralPath라 와일드카드 해석도 막혀. calcLocal도 같은 방식으로 바뀌었어.",
+      "detection": "Sysmon 1(ProcessCreate)이나 Security 4688에서 electerm.exe 아래 powershell.exe의 명령줄에 Get-ChildItem과 함께 예상 밖 cmdlet이 붙어 있는지 봐. PowerShell 스크립트 블록 로깅(Microsoft-Windows-PowerShell/Operational 4104)을 켜 두면 실제 실행된 스크립트 본문이 남아. 파일 쪽은 이름에 U+2018~U+201B가 든 폴더가 지표야.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "electerm 커밋 488b112의 부모, src/app/lib/fs.js 발췌",
+          "lang": "JavaScript",
+          "code": "function escapePowerShellArg (value) {\n  return String(value).replace(/'/g, \"''\") // U+0027 만 처리\n}\nfunction getFolderSizeWin (folderPath) {\n  const safePath = escapePowerShellArg(folderPath)\n  // U+2019 가 있으면 PowerShell은 여기서 문자열이 끝난 것으로 본다\n  return runWinCmd(`Get-ChildItem -Path '${safePath}' -Recurse | ...`)\n}"
+        },
+        {
+          "kind": "fix",
+          "label": "electerm/electerm 커밋 488b112 발췌",
+          "lang": "JavaScript",
+          "code": "function buildFolderSizeWinScript (folderPath) {\n  const encoded = encodeUtf8Base64(folderPath) // 경로는 base64 로만 전달\n  return `$p=[System.Text.Encoding]::UTF8.GetString(` +\n    `[System.Convert]::FromBase64String('${encoded}'));` +\n    `Get-ChildItem -LiteralPath $p -Recurse | ...` // 파서가 경로 문자를 보지 않음\n}"
+        }
+      ]
+    },
+    "deepDive": null
+  },
+  {
+    "cve": "CVE-2026-134808",
+    "date": "2026-11-23",
+    "grade": "green",
+    "title": "Gogs Windows에서 .git 보호를 8.3 짧은 이름과 NTFS 스트림 별칭으로 우회",
+    "product": "Gogs 0.14.4 미만 (Windows 호스트)",
+    "summary": "웹 편집기와 업로드로 .git 경로에 쓰는 걸 막는 isRepositoryGitPath가 대소문자와 끝의 점, 공백만 정규화해서, NTFS가 같은 디렉터리로 해석하는 GIT~1이나 .git::$INDEX_ALLOCATION 철자를 통과시켰어. 쓰기 권한 사용자가 .git/config나 hooks를 덮어써 Gogs 프로세스 권한으로 명령을 실행할 수 있어. Git 본체의 is_ntfs_dotgit 규칙을 그대로 옮겨 고쳤어.",
+    "cvss": 7.5,
+    "kev": false,
+    "poc": false,
+    "tags": [
+      "windows",
+      "ntfs",
+      "path-equivalence",
+      "8.3-short-name",
+      "ads",
+      "git",
+      "go"
+    ],
+    "links": [
+      {
+        "label": "gogs/gogs 커밋 aa7fc90 (PR 8483)",
+        "url": "https://github.com/gogs/gogs/commit/aa7fc903688471724a9565f1258d961e626d3cd0"
+      },
+      {
+        "label": "Gogs v0.14.4 릴리스",
+        "url": "https://github.com/gogs/gogs/releases/tag/v0.14.4"
+      },
+      {
+        "label": "VulnCheck 권고",
+        "url": "https://www.vulncheck.com/advisories/gogs-before-0.14.4-path-equivalence-bypass-via-ntfs-git-aliases"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-134808"
+      },
+      {
+        "label": "CVE.org",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-134808"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "internal/database/repo_editor.go의 isRepositoryGitPath는 경로를 / 와 \\ 로 쪼갠 뒤 각 컴포넌트를 소문자로 바꾸고 끝의 점과 공백을 잘라 \".git\"과 문자열 비교했어. 그런데 NTFS에서 .git 디렉터리를 가리키는 이름은 그것만이 아니야. 8.3 짧은 이름 GIT~1, 그리고 디렉터리의 기본 인덱스 스트림을 명시한 .git::$INDEX_ALLOCATION(또는 .git:$I30:$INDEX_ALLOCATION)도 같은 디렉터리로 열려. 즉 검사 함수가 쓰는 이름 공간(문자열)과 실제 파일 시스템이 쓰는 이름 공간(NTFS 해석)이 어긋난 경로 동등성 결함이야(CWE-41).",
+      "trigger": "원격, 인증 필요. 대상 저장소에 쓰기 권한이 있는 사용자가 웹 UI 파일 생성, 이름 변경, 업로드 기능으로 별칭 경로를 지정해야 해. Gogs가 Windows에서 NTFS 볼륨 위에 돌아가야 하고, GIT~1 경로는 그 볼륨에서 8.3 이름 생성이 켜져 있어야 동작해(추정, ADS 경로는 8.3 설정과 무관).",
+      "exploitation": "이론상 가능, 공개 PoC는 확인 못 했어. 프리미티브는 서버 쪽 .git 내부 임의 파일 쓰기야. hooks 아래 스크립트나 config의 core 설정을 바꾸면 다음 git 작업 때 Gogs 서비스 계정으로 실행되니 저장소 쓰기 권한이 호스트 명령 실행으로 올라가.",
+      "patch": "0.14.4. isDotGit 헬퍼를 새로 만들어 컴포넌트가 .git 또는 git~1로 시작하면 나머지에서 첫 콜론 뒤(스트림 이름과 타입)를 잘라내고, 남은 게 점과 공백뿐이면 .git으로 판정해. Git의 is_ntfs_dotgit와 같은 규칙이고 테스트에 git~10, git~1x, git~2는 false로 명시돼 있어. GIT~2 같은 다른 짧은 이름은 다루지 않는데 Git도 같은 선택을 했어(완결성은 Git 규칙 수준). 임시 완화로 fsutil 8dot3name으로 해당 볼륨 8.3 생성을 끄면 짧은 이름 경로는 막히지만 ADS 경로는 안 막혀.",
+      "detection": "Gogs 저장소 루트 아래 .git\\hooks, .git\\config의 수정 시각 변화, Sysmon 11(FileCreate)에서 gogs.exe가 .git\\hooks에 파일을 만드는 이벤트, Sysmon 1에서 gogs.exe 또는 git.exe 아래 cmd.exe, powershell.exe, sh.exe 자식 프로세스가 지표야. 웹 로그에서 경로에 ~1, ::$, $INDEX_ALLOCATION 문자열이 들어간 요청도 찾아볼 만해.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "gogs/gogs v0.14.3 internal/database/repo_editor.go 발췌",
+          "lang": "Go",
+          "code": "func isRepositoryGitPath(path string) bool {\n\tpath = strings.ToLower(path)\n\tfor _, component := range strings.FieldsFunc(path, sep) {\n\t\t// 끝의 점, 공백만 정규화. GIT~1, .git::$INDEX_ALLOCATION 은 통과\n\t\tif strings.TrimRight(component, \". \") == \".git\" {\n\t\t\treturn true\n\t\t}\n\t}\n\treturn false\n}"
+        },
+        {
+          "kind": "fix",
+          "label": "gogs/gogs 커밋 aa7fc90 발췌",
+          "lang": "Go",
+          "code": "func isDotGit(component string) bool {\n\tcomponent = strings.ToLower(component)\n\tvar rest string\n\tswitch {\n\tcase strings.HasPrefix(component, \".git\"): rest = component[len(\".git\"):]\n\tcase strings.HasPrefix(component, \"git~1\"): rest = component[len(\"git~1\"):] // 8.3 짧은 이름\n\tdefault: return false\n\t}\n\trest, _, _ = strings.Cut(rest, \":\") // ADS 스트림 이름과 타입 제거\n\treturn strings.TrimRight(rest, \". \") == \"\"\n}"
         }
       ]
     },

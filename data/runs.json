@@ -118,5 +118,11 @@
     "note": "CISA KEV 신규 없음(11/20 이후). AMD Zen1/Zen+ PSP 부트 ROM 서명 검증 결함(수정 불가, Google PoC 어드바이저리), AMD RAID Windows 드라이버 커널 읽기(대부분 수정 계획 없음, BYOVD 관점). Fastify middie와 fastify-express 경로 해석 불일치 미들웨어 우회 묶음, rclone sftp auth-proxy 캐시 키 인증 혼동. Apple CVE-2026-112487 iOS 영향 추가.",
     "count": 5,
     "deepDive": null
+  },
+  {
+    "date": "2026-11-23",
+    "note": "CISA KEV 신규 없음(카탈로그 11/20 이후 갱신 없음), 주말이라 red, orange 없음. Gogs Windows에서 GIT~1과 .git::$INDEX_ALLOCATION 별칭으로 .git 보호 우회, electerm 유니코드 따옴표(U+2019) PowerShell 인젝션. 심층: gitoxide Windows 심볼릭 링크 UNC 조회 NTLM 유출과 링크 체인 우회.",
+    "count": 2,
+    "deepDive": "CVE-2026-123532"
   }
 ]
