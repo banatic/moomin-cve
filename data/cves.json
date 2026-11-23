@@ -616,6 +616,72 @@
     "deepDive": null
   },
   {
+    "cve": "CVE-2026-107784",
+    "date": "2026-11-24",
+    "grade": "green",
+    "title": "CPython tarfile 필터가 Windows 드라이브 상대 경로(C:foo)를 통과시킴",
+    "product": "CPython 3.16.0 미만 (Windows, tarfile data/tar 필터)",
+    "summary": "tarfile의 data/tar 추출 필터가 'C:foo'처럼 드라이브는 있고 루트는 없는 이름을 절대 경로로 보지 않아서, 상대 목적지로 풀면 파일이 그 드라이브의 현재 디렉터리에 쓰이고 심볼릭 링크는 목적지 밖을 가리킬 수 있었어. 검사할 때 합친 경로와 실제로 쓸 때 합친 경로가 달라지는 Windows 경로 의미론 문제야. 실제 패치 diff 확인, PoC와 악용 보고는 없어.",
+    "cvss": 6.3,
+    "kev": false,
+    "poc": false,
+    "tags": [
+      "python",
+      "tarfile",
+      "windows",
+      "path-traversal",
+      "drive-relative",
+      "ntpath",
+      "cwe-22",
+      "cwe-59"
+    ],
+    "links": [
+      {
+        "label": "CPython PR 161334",
+        "url": "https://github.com/python/cpython/pull/161334"
+      },
+      {
+        "label": "CPython 이슈 161323",
+        "url": "https://github.com/python/cpython/issues/161323"
+      },
+      {
+        "label": "Python security-announce",
+        "url": "https://mail.python.org/archives/list/security-announce@python.org/thread/ANUOLPP6MFFJ45RT6XG2BRGZPFHMGDAS/"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-107784"
+      },
+      {
+        "label": "CVE.org",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-107784"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "Windows 경로에는 '절대(C:\\foo)', '루트 상대(\\foo)', '드라이브 상대(C:foo)'가 따로 있어. ntpath.isabs('C:foo')는 False라서 _get_filtered_attrs()의 절대 경로 검사를 통과해. 그런데 ntpath.join(dest, 'C:foo')는 dest의 드라이브가 다르거나 dest에 드라이브가 없으면 dest를 버리고 'C:foo'를 돌려줘. 필터는 realpath로 절대화한 dest_path와 합쳐 commonpath 검사를 하지만, 실제 추출(_extract_member)은 사용자가 준 상대 목적지와 합치니 검사 경로와 사용 경로가 어긋나(CWE-22). 링크 대상도 같은 이유로 isabs만 보고 통과했어(CWE-59).",
+      "trigger": "Windows에서 신뢰할 수 없는 tar를 filter='data' 또는 'tar'로, 상대 경로 목적지에 추출하는 애플리케이션. 공격자는 아카이브 내용만 통제하면 돼(AT:P).",
+      "exploitation": "프리미티브는 목적지 밖, 해당 드라이브의 현재 작업 디렉터리 기준 위치에 파일 쓰기, 또는 목적지 밖을 가리키는 링크 생성이야. 쓰기 위치가 cwd에 묶여 있어서 임의 경로 쓰기보다는 제한적이고, 실행 파일 검색 경로나 설정 파일 위치와 겹칠 때 영향이 커져. PoC, 악용 보고 없음.",
+      "patch": "커밋 b7444fc(gh-161323)가 이름과 링크 대상 모두에 대해 정규화 이후 os.path.splitdrive()로 드라이브가 있으면 AbsolutePathError/AbsoluteLinkError를 던지게 바꿨어. 검사 위치도 '..' 정규화 뒤로 옮겨서 정규화가 드라이브 접두어를 만들어내는 경우까지 막아. 3.16.0과 보안 브랜치 백포트로 배포. 임시 완화는 목적지를 절대 경로로 넘기는 것(같은 드라이브면 ntpath.join이 붙여 줌).",
+      "detection": "애플리케이션 계층 문제라 ETW 전용 이벤트는 없어. tar 멤버 이름에 ':' 가 두 번째 문자로 있는 항목을 사전 검사하거나, python.exe의 FileCreate(Sysmon EID 11) 경로가 추출 목적지 밖인 경우를 보는 정도.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "python/cpython 커밋 b7444fc 발췌 (수정 전, Lib/tarfile.py)",
+          "lang": "python",
+          "code": "if name.startswith(('/', os.sep)):\n    name = new_attrs['name'] = member.path.lstrip('/' + os.sep)\nif os.path.isabs(name):   # 'C:foo'는 isabs False라 통과\n    raise AbsolutePathError(member)\n...\nif os.path.isabs(member.linkname):   # 링크 대상도 같은 구멍\n    raise AbsoluteLinkError(member)"
+        },
+        {
+          "kind": "fix",
+          "label": "python/cpython 커밋 b7444fc 발췌 (수정 후)",
+          "lang": "python",
+          "code": "# '..' 정규화 이후에 검사\nif os.path.isabs(name) or os.path.splitdrive(name)[0]:\n    # os.path.join()은 드라이브 없는 목적지에 'C:foo'를 붙이지 않음\n    raise AbsolutePathError(member)\n...\nnormalized = os.path.normpath(member.linkname)\nif os.path.isabs(normalized) or os.path.splitdrive(normalized)[0]:\n    raise AbsoluteLinkError(member)"
+        }
+      ]
+    },
+    "deepDive": null
+  },
+  {
     "cve": "CVE-2026-109518",
     "date": "2026-11-05",
     "grade": "orange",
@@ -2191,6 +2257,49 @@
       "exploitation": "실제 악용됨. 악성 설정이 정상 서명된 Adobe 바이너리 biz_helper.exe와 악성 libcef.dll을 내려보낸다. Components 아래 SogouComMgr.exe 이름으로 교체하거나 biz_center 버전 폴더에 넣으면 SGTool.exe가 평소대로 실행할 때 사이드로딩된다. 별도 지속성 장치 없이 Sogou 자체 로딩 흐름이 지속성이 된다. 피해국은 홍콩, 태국, 일본, 베트남, 스리랑카, 오만으로 한국은 보고에 없다.",
       "patch": "16.10(2026-10-29 또는 30, ESET 글 안에서 날짜가 갈림)에서 HTTPS와 인증서 피닝 적용. ESET은 해당 호스트에서 SGTool.exe가 쓰는 평문 HTTP 엔드포인트 20개를 확인했는데 전부 옮겼는지는 공개된 세부 없음.",
       "detection": "SHA-1: libcef.dll 8A60A8E90E1F5F08F28FE5A6DD57BD686C20DC23, biz_helper.exe 79188C8DE2378B437D39E867475C5B4714A0D7C9. 네트워크: sogou-cdn[.]com, dev.soft-png-cdn[.]com, 47.239.250[.]102, 47.237.122[.]175. 레지스트리 HKCU\\Software\\Microsoft\\IME\\<HWID>\\pluginHash에 플러그인 저장. Sysmon 관점(추정): Event ID 7에서 Sogou Components 경로의 libcef.dll 로드, 1에서 SGTool.exe 자식 SogouComMgr.exe의 서명자가 Adobe, 22에서 DNS 응답 대조. 전체 IOC는 ESET GitHub malware-ioc의 slippynunchucks."
+    },
+    "deepDive": null
+  },
+  {
+    "cve": "CVE-2026-120787",
+    "date": "2026-11-24",
+    "grade": "orange",
+    "title": "PowerPoint 인증서 검증 결함 원격 코드 실행",
+    "product": "Microsoft 365 Apps for Enterprise, Office LTSC 2021 (16.0.14334.21048 미만)",
+    "summary": "PowerPoint의 인증서 검증 결함(CWE-295)으로 원격 코드 실행이 가능하다고 MSRC가 11/23 공개했어. 사용자 상호작용이 필요하고 공격 복잡도가 높으며(AC:H, UI:R) MS 평가는 익스플로잇 코드 미확인(E:U)이야. 어느 인증서 검증인지 같은 기술 세부는 공개 안 됐어.",
+    "cvss": 7.5,
+    "kev": false,
+    "poc": false,
+    "tags": [
+      "microsoft",
+      "office",
+      "powerpoint",
+      "certificate",
+      "rce",
+      "cwe-295",
+      "school-pc"
+    ],
+    "links": [
+      {
+        "label": "MSRC",
+        "url": "https://msrc.microsoft.com/update-guide/vulnerability/CVE-2026-120787"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-120787"
+      },
+      {
+        "label": "CVE.org",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-120787"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "MSRC는 'PowerPoint의 부적절한 인증서 검증'(CWE-295)이라고만 밝혔어. 공개된 세부 없음. 인증서 검증이 코드 실행으로 이어지는 구조라면 서명된 콘텐츠(매크로, 추가 기능, 원격 템플릿 등)의 신뢰 판단이나 원격 리소스 TLS 검증을 건너뛰는 경로일 가능성이 있지만 이건 추정이야.",
+      "trigger": "네트워크, 사용자 상호작용 필요(UI:R), AC:H. 피해자가 파일을 열거나 특정 동작을 해야 하고 추가 조건이 있다는 뜻이야.",
+      "exploitation": "공개된 세부 없음. MS 익스플로잇 성숙도 E:U(미확인), 실제 악용 보고 없음.",
+      "patch": "Office 보안 업데이트로 수정. LTSC 2021 기준 16.0.14334.21048, Microsoft 365 Apps는 aka.ms/OfficeSecurityReleases의 채널별 빌드. 학교 PC는 Office 자동 업데이트(Click-to-Run)가 켜져 있는지 확인하면 돼.",
+      "detection": "공개된 IoC 없음. 일반 관점으로 POWERPNT.EXE의 비정상 자식 프로세스(Sysmon EID 1)와 외부 네트워크 연결(Sysmon EID 3)을 보는 정도."
     },
     "deepDive": null
   },
@@ -4938,6 +5047,65 @@
     "deepDive": null
   },
   {
+    "cve": "CVE-2026-132856",
+    "date": "2026-11-24",
+    "grade": "green",
+    "title": "ZoneAlarm Windows 클라이언트 링크 따라가기와 서명 검증 결함 SYSTEM 상승",
+    "product": "Check Point ZoneAlarm Windows 클라이언트 4.4.217.20710 미만",
+    "summary": "ZoneAlarm Windows 클라이언트에서 일반 사용자가 SYSTEM으로 코드를 실행할 수 있는 로컬 권한 상승이야. CWE가 링크 따라가기(CWE-59)와 부적절한 서명 검증(CWE-347) 두 개라, 보안 제품 서비스가 사용자 영향 경로의 파일을 서명 확인 후 쓰는 과정이 어긋난 것으로 보여(추정). Check Point sk1000415 외 세부, PoC, 악용 보고는 없어.",
+    "cvss": 7.8,
+    "kev": false,
+    "poc": false,
+    "tags": [
+      "windows",
+      "zonealarm",
+      "check-point",
+      "security-product",
+      "symlink",
+      "signature",
+      "lpe",
+      "cwe-59",
+      "cwe-347"
+    ],
+    "links": [
+      {
+        "label": "Check Point sk1000415",
+        "url": "https://support.checkpoint.com/results/sk/sk1000415"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-132856"
+      },
+      {
+        "label": "CVE.org",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-132856"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "Check Point는 '로컬 사용자가 SYSTEM으로 코드 실행 가능'이라고만 했고 CWE-59와 CWE-347을 붙였어. 공개된 세부 없음. 두 CWE의 조합은 보안 제품의 SYSTEM 서비스가 서명을 검증한 파일과 실제로 로드하거나 복사하는 파일이 링크(정션, 오브젝트 매니저 심볼릭 링크, 하드 링크)로 바뀔 수 있는 TOCTOU, 또는 서명 검증 자체가 불완전한 경우를 시사해(추정). ZoneAlarm은 2019년에도 업데이트 서비스 계열 LPE가 있었어.",
+      "trigger": "로컬, 일반 사용자로 코드 실행 가능해야 해(PR:L, UI:N).",
+      "exploitation": "공개된 세부 없음. 성공하면 보안 제품 서비스 문맥의 SYSTEM 코드 실행이라 EDR/AV 자체를 무력화하는 발판이 될 수 있어. PoC, 악용 보고 없음.",
+      "patch": "4.4.217.20710 이상으로 업데이트. 변경 내용은 비공개.",
+      "detection": "ZoneAlarm 서비스 프로세스(vsmon.exe 등)가 사용자 쓰기 가능 경로(%TEMP%, %ProgramData% 하위)의 바이너리를 로드하는지(Sysmon EID 7 ImageLoad), 일반 사용자 프로세스의 정션/심볼릭 링크 생성(ETW Microsoft-Windows-Kernel-File, FSCTL_SET_REPARSE_POINT). 제품 전용 IoC는 공개 안 됨.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "재구성, 실제 소스 아님 (추정, CWE-59와 CWE-347 조합의 일반 패턴)",
+          "lang": "c",
+          "code": "// SYSTEM 서비스\nif (VerifySignature(L\"C:\\\\ProgramData\\\\ZA\\\\upd\\\\x.dll\")) {\n    // 검증과 사용 사이에 경로가 링크로 바뀔 수 있음 (TOCTOU)\n    LoadLibraryW(L\"C:\\\\ProgramData\\\\ZA\\\\upd\\\\x.dll\");\n}"
+        },
+        {
+          "kind": "fix",
+          "label": "재구성, 실제 소스 아님 (수정 방향)",
+          "lang": "c",
+          "code": "// 리파스 포인트 따라가지 않고 열고, 같은 핸들로 검증과 사용\nh = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ, NULL,\n    OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT, NULL);\nVerifySignatureByHandle(h);   // 핸들 기준 검증\n// 또는 SYSTEM 전용 ACL 디렉터리로 먼저 복사 후 검증, 로드"
+        }
+      ]
+    },
+    "deepDive": null
+  },
+  {
     "cve": "CVE-2026-133250",
     "date": "2026-11-22",
     "grade": "green",
@@ -5318,6 +5486,191 @@
           "label": "gogs/gogs 커밋 aa7fc90 발췌",
           "lang": "Go",
           "code": "func isDotGit(component string) bool {\n\tcomponent = strings.ToLower(component)\n\tvar rest string\n\tswitch {\n\tcase strings.HasPrefix(component, \".git\"): rest = component[len(\".git\"):]\n\tcase strings.HasPrefix(component, \"git~1\"): rest = component[len(\"git~1\"):] // 8.3 짧은 이름\n\tdefault: return false\n\t}\n\trest, _, _ = strings.Cut(rest, \":\") // ADS 스트림 이름과 타입 제거\n\treturn strings.TrimRight(rest, \". \") == \"\"\n}"
+        }
+      ]
+    },
+    "deepDive": null
+  },
+  {
+    "cve": "CVE-2026-135170",
+    "date": "2026-11-24",
+    "grade": "green",
+    "title": "Wing FTP Server LDAP 로그인명 Lua 긴 문자열 탈출 코드 주입",
+    "product": "Wing FTP Server 8.2.8 미만 (LDAP 인증 사용 시)",
+    "summary": "Wing FTP는 세션 상태를 Lua 소스로 직렬화해 파일에 쓰는데, LDAP 로그인명을 이스케이프 없이 Lua 긴 문자열 리터럴 안에 넣어서 종결자를 포함한 이름이면 이후 세션 요청 때 코드가 실행돼. 2025년 KEV 등재된 CVE-2025-47812와 같은 '데이터를 코드로 직렬화' 계열이야. LDAP 인증 계정이 필요해서 조건은 까다롭고 PoC, 악용 보고는 없어.",
+    "cvss": 7.5,
+    "kev": false,
+    "poc": false,
+    "tags": [
+      "wing-ftp",
+      "lua",
+      "code-injection",
+      "serialization",
+      "ldap",
+      "cwe-94"
+    ],
+    "links": [
+      {
+        "label": "VulnCheck 어드바이저리",
+        "url": "https://www.vulncheck.com/advisories/wing-ftp-server-before-8.2.8-lua-code-injection-via-ldap-login-name"
+      },
+      {
+        "label": "Wing FTP 변경 이력",
+        "url": "https://www.wftpserver.com/serverhistory.htm"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-135170"
+      },
+      {
+        "label": "CVE.org",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-135170"
+      },
+      {
+        "label": "전례 CVE-2025-47812 (Rapid7)",
+        "url": "https://www.rapid7.com/db/vulnerabilities/cve-2025-47812/"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "세션 파일이 데이터 포맷이 아니라 실행 가능한 Lua 소스라서, 문자열 값을 넣을 때 리터럴 경계를 지키는 게 유일한 방어선이야. LDAP 로그인명이 Lua 긴 문자열 [[ ]] 안에 그대로 들어가고, 이름에 닫는 구분자가 들어 있으면 리터럴이 일찍 끝나고 뒤 내용이 Lua 문장으로 해석돼(CWE-94). 세션 파일은 다음 요청 때 로드되어 실행되니 저장 시점과 실행 시점이 분리된 2단계 주입이야. CVE-2025-47812는 NUL 바이트로 검사와 저장이 어긋난 경우였고, 이번엔 LDAP 경로에서 이름 이스케이프가 빠진 거야.",
+      "trigger": "원격, LDAP 인증이 켜져 있고 공격자가 원하는 로그인명으로 LDAP 인증에 성공할 수 있어야 해(PR:L, AC:H). 로컬 계정 경로는 해당 안 돼.",
+      "exploitation": "주입된 Lua가 세션 로드 때 Wing FTP 서비스 계정 권한으로 실행돼. Windows 설치에서는 SYSTEM, Linux에서는 root로 도는 경우가 많아. 공개 PoC 없음.",
+      "patch": "8.2.8. 근본적으로는 세션을 Lua 소스가 아닌 데이터 포맷으로 저장하거나, 문자열을 %q 방식으로 직렬화해야 해. 수정 내용의 상세는 공개 안 됐어.",
+      "detection": "세션 디렉터리(설치 경로의 session 폴더) 파일에 os.execute, io.popen 같은 함수명이 나타나는지 검사. 서비스 프로세스의 셸 자식 프로세스(Sysmon EID 1).",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "재구성, 실제 소스 아님",
+          "lang": "lua",
+          "code": "-- 세션을 Lua 소스로 저장\nf:write('username = [[' .. login_name .. ']]\\n')\n-- login_name에 리터럴 종결자가 있으면 이후가 코드가 됨\n-- 다음 요청 때 dofile(session_path)"
+        },
+        {
+          "kind": "fix",
+          "label": "재구성, 실제 소스 아님 (수정 방향)",
+          "lang": "lua",
+          "code": "-- %q는 따옴표, 개행, 제어문자를 이스케이프\nf:write(string.format('username = %q\\n', login_name))\n-- 더 나은 방법: Lua 소스 대신 JSON 같은 데이터 포맷"
+        }
+      ]
+    },
+    "deepDive": null
+  },
+  {
+    "cve": "CVE-2026-135171",
+    "date": "2026-11-24",
+    "grade": "orange",
+    "title": "Wing FTP Server 관리자 세션 ID 예측, 무인증 관리자 탈취",
+    "product": "Wing FTP Server 8.2.8 미만",
+    "summary": "관리자 세션 ID가 프로세스, 시각, ServerID, 클라이언트 IP 같은 추측 가능한 값으로 만들어져, 무인증 공격자가 후보를 열거하고 service_get_license.html을 유효성 오라클로 써서 살아 있는 관리자 세션을 재사용할 수 있어. 관리 권한은 Lua 콘솔을 포함하니 사실상 서버 명령 실행까지 이어져. 8.2.8에서 수정, VulnCheck 공개, PoC와 악용 보고는 아직 없어.",
+    "cvss": 8.1,
+    "kev": false,
+    "poc": false,
+    "tags": [
+      "wing-ftp",
+      "session",
+      "prng",
+      "auth-bypass",
+      "lua",
+      "cwe-341"
+    ],
+    "links": [
+      {
+        "label": "VulnCheck 어드바이저리",
+        "url": "https://www.vulncheck.com/advisories/wing-ftp-server-before-8.2.8-predictable-administrator-session-identifier"
+      },
+      {
+        "label": "Wing FTP 변경 이력",
+        "url": "https://www.wftpserver.com/serverhistory.htm"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-135171"
+      },
+      {
+        "label": "CVE.org",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-135171"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "관리 웹 인터페이스의 세션 식별자가 CSPRNG가 아니라 프로세스 상태, 시간, ServerID, 클라이언트 IP에서 유도돼(CWE-341, 관찰 가능한 상태에서 나온 예측 가능한 값). 공격자가 이 입력 대부분을 알거나 좁은 범위로 추정할 수 있으니 ID 공간이 사실상 작아. 여기에 인증 없이 세션 유효 여부를 구분해 주는 엔드포인트(service_get_license.html)가 있어서 오프라인 추측을 온라인 검증으로 바꿔 줘. 세션 ID는 추측 불가능해야 한다는 불변식이 깨진 거야.",
+      "trigger": "원격 무인증, 관리 포트(기본 웹 관리 콘솔)에 도달 가능해야 하고, 그 시점에 관리자가 로그인해 세션이 살아 있어야 해(AC:H, AT:P).",
+      "exploitation": "후보 세션 ID를 만들어 오라클 엔드포인트로 맞는 것을 찾고, 그 쿠키로 관리 콘솔에 들어가 Lua 콘솔로 서비스 계정(Windows에선 흔히 SYSTEM) 권한 코드 실행까지 가는 흐름이야. Wing FTP는 2025년 CVE-2025-47812(세션 파일 Lua 주입)이 KEV에 올라 실제 악용된 전례가 있어서 표적 가치가 높아. 공개 PoC 없음.",
+      "patch": "8.2.8로 업데이트. 같은 릴리스에서 CVE-2026-135170(LDAP 로그인명 Lua 주입)과 NUL 바이트 RCE 어드바이저리도 같이 고쳐졌어. 관리 콘솔을 인터넷에 노출하지 말고 관리자 IP 제한을 거는 게 임시 완화야.",
+      "detection": "관리 콘솔 접근 로그에서 같은 출발지의 service_get_license.html 대량 요청, 관리자 로그인 기록 없이 새 IP에서 관리 기능 호출. 호스트에선 Wing FTP 서비스 프로세스 아래 cmd.exe, powershell.exe 자식 프로세스(Sysmon EID 1)가 강한 지표야.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "재구성, 실제 소스 아님 (어드바이저리 설명 기반)",
+          "lang": "lua",
+          "code": "-- 세션 ID를 관찰 가능한 상태에서 유도\nlocal sid = md5(pid .. os.time() .. server_id .. client_ip)\n-- 입력을 추정할 수 있으면 sid 후보가 작음\nset_cookie(\"UIDADMIN\", sid)"
+        },
+        {
+          "kind": "fix",
+          "label": "재구성, 실제 소스 아님 (수정 방향)",
+          "lang": "lua",
+          "code": "-- OS CSPRNG에서 128비트 이상 무작위\nlocal sid = hex(crypto_random_bytes(16))\nset_cookie(\"UIDADMIN\", sid)\n-- 세션 유효성 오라클이 되는 무인증 엔드포인트 제거"
+        }
+      ]
+    },
+    "deepDive": null
+  },
+  {
+    "cve": "CVE-2026-135452",
+    "date": "2026-11-24",
+    "grade": "orange",
+    "title": "HP Hotkey UWP Service 하드 링크 따라가기로 SYSTEM 권한 상승",
+    "product": "HP Hotkey Support (HP Hotkey UWP Service) 8.10.48.359 미만",
+    "summary": "HP 노트북에 기본 설치되는 Hotkey UWP 서비스가 SYSTEM으로 파일을 다룰 때 Windows 하드 링크를 확인하지 않아(CWE-65) 일반 사용자가 권한 상승할 수 있어. HP는 HPSBHF04102로 Hotkey Support 업데이트를 내놨고 HP Programmable Key 사용자를 대상으로 명시했어. 공개 PoC, 실제 악용 보고는 없고 세부 코드 경로도 공개 안 됐어.",
+    "cvss": 8.4,
+    "kev": false,
+    "poc": false,
+    "tags": [
+      "windows",
+      "hp",
+      "oem",
+      "service",
+      "hard-link",
+      "lpe",
+      "cwe-65"
+    ],
+    "links": [
+      {
+        "label": "HP 보안 공지 HPSBHF04102",
+        "url": "https://support.hp.com/us-en/document/ish_14484164-14484183-16/hpsbhf04102"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-135452"
+      },
+      {
+        "label": "CVE.org",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-135452"
+      },
+      {
+        "label": "이전 사례 CVE-2024-27458 (cirosec)",
+        "url": "https://cirosec.de/en/news/vulnerability-in-hp-hotkey-support/"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "HP Hotkey UWP Service는 LocalSystem으로 도는 OEM 서비스이고, CNA가 붙인 CWE-65(Windows Hard Link)는 서비스가 낮은 권한 사용자가 만들 수 있는 위치의 파일을 열거나 쓰거나 권한을 바꿀 때, 그 파일이 다른 보호된 파일을 가리키는 하드 링크인지 확인하지 않았다는 뜻이야. NTFS 하드 링크는 같은 볼륨 안에서 MFT 레코드를 공유하는 두 번째 이름이라, 링크 경로로 연 핸들은 원본 파일 객체에 그대로 작동해. 깨진 불변식은 'SYSTEM 서비스가 쓰는 대상 파일은 서비스가 만든 것'이라는 가정이야. 어떤 파일과 어떤 동작(쓰기, DACL 변경, 삭제)이 문제인지는 HP가 공개하지 않았어. 같은 제품군에서 2024년 CVE-2024-27458도 있었어.",
+      "trigger": "로컬, 일반 사용자 권한으로 코드 실행이 가능해야 해. 사용자 상호작용 불필요(CVSS 4.0 AV:L/PR:L/UI:N). HP Hotkey Support가 설치된 HP 노트북(특히 HP Programmable Key 사용 환경)이 대상이야.",
+      "exploitation": "일반적인 하드 링크 계열이라면 사용자 쓰기 가능 위치에 보호 파일을 가리키는 하드 링크를 미리 두고, 서비스가 그 경로에 SYSTEM으로 쓰기나 권한 변경을 하게 만들어 보호 파일을 덮거나 접근 권한을 얻는 흐름이야(추정). 공개된 세부 없음, PoC 없음, 실제 악용 보고 없음.",
+      "patch": "Hotkey Support 8.10.48.359 이상으로 업데이트. HP는 'mitigation 배포'라고만 했고 무엇을 바꿨는지는 공개 안 했어. 학교에서는 HP Support Assistant나 HP Image Assistant로 일괄 갱신하고, 쓰지 않는 기능이면 Hotkey Support 제거도 선택지야.",
+      "detection": "공개 IoC 없음. 일반 탐지 관점: 일반 사용자 프로세스가 C:\\Windows나 Program Files 아래 파일을 대상으로 하드 링크를 만드는 행위. ETW Microsoft-Windows-Kernel-File의 SetLinkPath(하드 링크 생성) 이벤트, 이어서 서비스 프로세스(HotKeyServiceUWP 계열)가 같은 파일 ID에 쓰기 하는 패턴을 상관하면 돼(이벤트 ID는 OS 빌드별 확인 필요). Sysmon은 하드 링크 전용 이벤트가 없어서 EID 11(FileCreate)과 EID 1의 프로세스 트리로 보완해.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "재구성, 실제 소스 아님 (추정, CWE-65 일반 패턴)",
+          "lang": "c",
+          "code": "// SYSTEM 서비스, 사용자도 쓸 수 있는 디렉터리\nh = CreateFileW(L\"C:\\\\ProgramData\\\\Vendor\\\\cfg.dat\",\n    GENERIC_WRITE, 0, NULL, OPEN_ALWAYS, 0, NULL);\n// 이 이름이 보호된 파일의 하드 링크여도 그대로 열림\nWriteFile(h, buf, len, &n, NULL);"
+        },
+        {
+          "kind": "fix",
+          "label": "재구성, 실제 소스 아님 (일반적 완화 방향)",
+          "lang": "c",
+          "code": "// 1) 서비스 전용 디렉터리에 사용자 쓰기 권한 제거 (DACL)\n// 2) 연 뒤 링크 수 확인\nGetFileInformationByHandle(h, &bhi);\nif (bhi.nNumberOfLinks > 1) { CloseHandle(h); return ERROR_ACCESS_DENIED; }\n// 3) 또는 호출 사용자로 가장(impersonate)한 상태에서 파일 작업"
         }
       ]
     },

@@ -124,5 +124,11 @@
     "note": "CISA KEV 신규 없음(카탈로그 11/20 이후 갱신 없음), 주말이라 red, orange 없음. Gogs Windows에서 GIT~1과 .git::$INDEX_ALLOCATION 별칭으로 .git 보호 우회, electerm 유니코드 따옴표(U+2019) PowerShell 인젝션. 심층: gitoxide Windows 심볼릭 링크 UNC 조회 NTLM 유출과 링크 체인 우회.",
     "count": 2,
     "deepDive": "CVE-2026-123532"
+  },
+  {
+    "date": "2026-11-24",
+    "note": "CISA KEV 원본 데이터는 11/20 이후 갱신 없음(11/23 2건 추가 공지 확인, CVE ID 미확인). HP Hotkey UWP 서비스 하드 링크 LPE, Wing FTP 8.2.8 관리자 세션 ID 예측과 LDAP 로그인명 Lua 주입, PowerPoint 인증서 검증 RCE, CPython tarfile Windows 드라이브 상대 경로 필터 우회, ZoneAlarm 링크/서명 LPE.",
+    "count": 6,
+    "deepDive": null
   }
 ]
