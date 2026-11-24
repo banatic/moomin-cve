@@ -130,5 +130,11 @@
     "note": "CISA KEV 원본 데이터는 11/20 이후 갱신 없음(11/23 2건 추가 공지 확인, CVE ID 미확인). HP Hotkey UWP 서비스 하드 링크 LPE, Wing FTP 8.2.8 관리자 세션 ID 예측과 LDAP 로그인명 Lua 주입, PowerPoint 인증서 검증 RCE, CPython tarfile Windows 드라이브 상대 경로 필터 우회, ZoneAlarm 링크/서명 LPE.",
     "count": 6,
     "deepDive": null
+  },
+  {
+    "date": "2026-11-25",
+    "note": "CISA KEV 신규 5건(11/23 2건, 11/24 3건): Drupal 설치기 fail-open 재설치 RCE, Idunno.AntiCsrf 키 없는 ObjectStateFormatter 역직렬화(패치 없음), MONAI Label 경로 순회(AI 에이전트 악용 보도), Optimizely 가입 흐름 결함 공급망 JS 변조, N-able MailAssure SSRF. Chrome 158 Variations 샌드박스 밖 실행(Critical), TXOne Stellar Agent IPC 인가 누락.",
+    "count": 7,
+    "deepDive": null
   }
 ]
