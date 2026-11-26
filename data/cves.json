@@ -2979,6 +2979,77 @@
     "deepDive": "2026-11-09"
   },
   {
+    "cve": "CVE-2026-123007",
+    "date": "2026-11-27",
+    "grade": "orange",
+    "title": "NGINX HTTP/2 스트림 종료 환불로 연결 흐름 제어 창이 상한을 넘어 메모리 손상 (nginx2root)",
+    "product": "NGINX Open Source, NGINX Plus (HTTP/2 사용 시)",
+    "summary": "11/18 nginx 1.31.9 등으로 패치된 nginx2root 묶음의 핵심 건. 종료된 스트림의 미전송 바이트를 연결 송신 창에 돌려줄 때, 그 사이 클라이언트가 WINDOW_UPDATE로 창을 늘려 두면 창이 RFC 상한(2^31-1)을 넘고 ngx_http_v2_send_chain()의 버퍼 크기 계산이 깨진다. 공개 PoC가 있다는 보도가 있고, 싱가포르 CSA가 'Active Exploitation of Vulnerability in F5 NGINX' 경보(AL-2026-168)를 냈는데 본문과 날짜는 확인 못 했다. CISA KEV 미등재.",
+    "cvss": null,
+    "kev": false,
+    "poc": true,
+    "tags": [
+      "nginx",
+      "http2",
+      "flow-control",
+      "memory-corruption",
+      "linux"
+    ],
+    "links": [
+      {
+        "label": "nginx 커밋 e27f5fa (수정)",
+        "url": "https://github.com/nginx/nginx/commit/e27f5fa84fe6e98505e70bc543b748747dad0a3b"
+      },
+      {
+        "label": "Wiz: Unauthenticated RCE in NGINX",
+        "url": "https://www.wiz.io/blog/nginx-http2-rce-vulnerabilities"
+      },
+      {
+        "label": "CSA 싱가포르 AL-2026-168",
+        "url": "https://www.csa.gov.sg/alerts-and-advisories/alerts/al-2026-168/"
+      },
+      {
+        "label": "Tenable nginx2root FAQ",
+        "url": "https://www.tenable.com/blog/nginx2root-cve-2026-123007-frequently-asked-questions-about-five-critical-nginx"
+      },
+      {
+        "label": "CERT-EU 2026-022",
+        "url": "https://cert.europa.eu/publications/security-advisories/2026-022/"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-123007"
+      },
+      {
+        "label": "CVE.org",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-123007"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "HTTP/2 연결 송신 창 h2c->send_window는 DATA 프레임을 큐에 넣는 순간 ngx_http_v2_send_chain()에서 차감된다. 스트림이 중간에 끝나면 ngx_http_v2_filter_cleanup()이 아직 안 보낸 큐 프레임 바이트를 send_window에 환불한다. 그런데 ngx_http_v2_state_window_update()의 상한 검사는 send_window만 보고 '큐에 있지만 아직 안 나간 바이트'를 몰랐다. 클라이언트 입장에선 큐 프레임은 아직 창 안에 있으므로, 큐가 차 있는 동안 상한까지 WINDOW_UPDATE를 보내고 스트림을 끊으면 환불이 더해져 send_window가 NGX_HTTP_V2_MAX_WINDOW를 넘는다. 이 불변식 붕괴가 send_chain의 버퍼 크기 제어를 망가뜨려 메모리 손상으로 이어진다고 커밋 메시지가 설명한다(CWE-190/787 계열).",
+      "trigger": "원격 무인증 HTTP/2 클라이언트. 서버가 HTTP/2를 켜 두고(listen ... http2 또는 http2 on) 클라이언트로 응답 본문을 보내는 상황이면 된다. 특별한 설정 불필요.",
+      "exploitation": "흐름 제어 산술 붕괴로 워커 프로세스 힙 손상이 생기고, 최소 세그폴트, 연구자 주장으로는 원격 코드 실행까지 이어진다. nginx2root라는 이름은 컨테이너 환경에서 루트 권한 체인으로 이어진다는 연구자 주장에서 왔다. 재현 세부는 다루지 않는다.",
+      "patch": "커밋 e27f5fa가 h2c->send_queued 카운터를 추가해 큐잉 시 증가, 실제 전송과 cleanup 환불 시 감소시키고, WINDOW_UPDATE 상한 검사를 MAX_WINDOW - send_window - send_queued로 바꿨다. 1.31.10 이후 46ee78a 커밋은 SETTINGS의 INITIAL_WINDOW_SIZE 증분이 스트림 창을 넘기면 스트림만 끊던 동작을 연결 오류(FLOW_CTRL_ERROR)로 바꿔 RFC 9113 6.9.2에 맞췄다(관련 보강, 별도 CVE 여부 확인 못 함). 수정 버전은 1.31.9 이상, 안정 브랜치와 NGINX Plus 해당 릴리스. 임시 완화책은 HTTP/2 비활성화.",
+      "detection": "error_log에서 worker process exited on signal 11 반복, 'client violated connection flow control' INFO 로그(패치 후 공격 시도 흔적). 같은 연결에서 대량 WINDOW_UPDATE 후 RST_STREAM 패턴. 공개 IOC는 확인 못 함.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "nginx/nginx 커밋 e27f5fa 이전 발췌 (src/http/v2/ngx_http_v2.c)",
+          "lang": "c",
+          "code": "/* ngx_http_v2_state_window_update() */\n/* 큐에 쌓인 미전송 바이트(나중에 환불될 몫)를 고려하지 않음 */\nif (window > NGX_HTTP_V2_MAX_WINDOW - h2c->send_window) {\n    return ngx_http_v2_connection_error(h2c, NGX_HTTP_V2_FLOW_CTRL_ERROR);\n}\n/* ngx_http_v2_filter_cleanup(): 종료 스트림 환불 */\nh2c->send_window += window;   /* 상한 초과 가능 */"
+        },
+        {
+          "kind": "fix",
+          "label": "nginx/nginx 커밋 e27f5fa 발췌",
+          "lang": "c",
+          "code": "+    size_t  send_queued;          /* ngx_http_v2_connection_s 새 필드 */\n\n-    if (window > NGX_HTTP_V2_MAX_WINDOW - h2c->send_window) {\n+    if (window > NGX_HTTP_V2_MAX_WINDOW - h2c->send_window - h2c->send_queued) {\n\n     h2c->send_window -= frame_size;\n+    h2c->send_queued += frame_size;   /* 큐잉 시 증가 */\n     h2c->send_window += window;\n+    h2c->send_queued -= window;       /* 환불 시 감소 */"
+        }
+      ]
+    },
+    "deepDive": null
+  },
+  {
     "cve": "CVE-2026-123039",
     "date": "2026-11-14",
     "grade": "red",
@@ -3253,6 +3324,72 @@
     "deepDive": "2026-11-23"
   },
   {
+    "cve": "CVE-2026-123633",
+    "date": "2026-11-27",
+    "grade": "orange",
+    "title": "NGINX HTTP/2 부분 HEADERS로 reusable 표시된 연결이 스트림 처리 중 해제되는 UAF",
+    "product": "NGINX Open Source, NGINX Plus (HTTP/2 사용 시)",
+    "summary": "nginx2root 묶음의 두 번째 HTTP/2 건. HEADERS 프레임 첫 바이트만 보낸 연결은 DoS 대응으로 '재사용 가능(reusable)'으로 등록되는데, 나머지 바이트가 와서 스트림이 생겨도 이 표시가 풀리지 않았다. worker_connections가 부족해 nginx가 reusable 연결을 회수하려 하면 스트림 처리 도중 연결 풀이 해제되어 상위 스택에서 UAF가 난다. 공개 PoC 보도 있음, KEV 미등재.",
+    "cvss": null,
+    "kev": false,
+    "poc": true,
+    "tags": [
+      "nginx",
+      "http2",
+      "uaf",
+      "linux"
+    ],
+    "links": [
+      {
+        "label": "nginx 커밋 2df48a5 (수정)",
+        "url": "https://github.com/nginx/nginx/commit/2df48a501d0fb8212b7d39dffeeff5876332ba59"
+      },
+      {
+        "label": "Wiz: Unauthenticated RCE in NGINX",
+        "url": "https://www.wiz.io/blog/nginx-http2-rce-vulnerabilities"
+      },
+      {
+        "label": "Palo Alto Networks 영향 공지",
+        "url": "https://security.paloaltonetworks.com/CVE-2026-123633"
+      },
+      {
+        "label": "Red Hat CVE-2026-123633",
+        "url": "https://access.redhat.com/security/cve/cve-2026-123633"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-123633"
+      },
+      {
+        "label": "CVE.org",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-123633"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "nginx는 연결이 부족할 때 ngx_reusable_connection()으로 등록된 유휴 연결을 강제로 닫아 슬롯을 회수한다. 커밋 76672e650 이후 '스트림 없음 + 프레임 일부만 읽음' 상태의 HTTP/2 연결도 reusable로 등록됐는데, ngx_http_v2_create_stream()이 이 표시를 해제하지 않아 '스트림이 있는 연결은 reusable이 아니다'라는 불변식이 깨졌다. 스트림 처리 중(예: upstream 연결 시) 연결 회수가 일어나면 nginx는 스트림이 있음을 보고 GOAWAY 전송을 시도하고, 전송 실패 시 연결을 즉시 닫아 pool을 해제한다. 호출 스택 위쪽은 여전히 그 pool의 객체를 쓰고 있어 UAF가 된다(CWE-416).",
+      "trigger": "원격 무인증 HTTP/2 클라이언트. 워커의 worker_connections 한도에 근접해 연결 회수가 일어나는 조건이 필요하다(공격자가 연결을 많이 열어 유도 가능, 추정).",
+      "exploitation": "해제된 연결 pool 메모리 재사용으로 워커 크래시, 연구자 주장으로는 코드 실행까지. 재현 세부는 다루지 않는다.",
+      "patch": "커밋 2df48a5가 ngx_http_v2_create_stream()에서 ngx_reusable_connection(h2c->connection, 0)을 호출해 스트림 생성 즉시 reusable 표시를 해제한다. 1.31.9 이상에서 수정. 완화책은 HTTP/2 비활성화 또는 worker_connections 여유 확보(근본 해결 아님).",
+      "detection": "error_log의 'worker_connections are not enough' 경고와 동시에 발생하는 signal 11 워커 종료. 반쪽 HEADERS 프레임을 보내는 연결이 대량으로 열리는 패턴.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "nginx/nginx 커밋 2df48a5 이전 발췌 (ngx_http_v2_create_stream)",
+          "lang": "c",
+          "code": "h2c->processing++;\n/* 부분 프레임 때문에 reusable로 등록된 상태가 그대로 남음 */\n/* -> 연결 회수 시 스트림 처리 중에 pool이 해제될 수 있음 */\nif (h2c->connection->read->timer_set) {\n    ngx_del_timer(h2c->connection->read);\n}"
+        },
+        {
+          "kind": "fix",
+          "label": "nginx/nginx 커밋 2df48a5 발췌",
+          "lang": "c",
+          "code": " h2c->processing++;\n\n+ngx_reusable_connection(h2c->connection, 0);  /* 스트림 생기면 회수 대상에서 제외 */\n\n if (h2c->connection->read->timer_set) {\n     ngx_del_timer(h2c->connection->read);\n }"
+        }
+      ]
+    },
+    "deepDive": null
+  },
+  {
     "cve": "CVE-2026-123890",
     "date": "2026-11-20",
     "grade": "red",
@@ -3306,6 +3443,133 @@
       "exploitation": "실제 악용됨. Google 위협 인텔리전스가 ARMORY CASTLE의 vSphere 공격 체인을 공개했다. 인증 우회 뒤 디렉터리 쓰기로 SSO 관리자 권한을 얻고 vCenter와 하위 ESXi로 이어지는 흐름으로 보도됐다. 바인드 경로 수준의 세부는 공개 자료로 확인 못 함.",
       "patch": "vCenter 9.1.1.0200, 9.0.2.0200, 8.0 U3m, VCF 5.2.5. Telco Cloud는 KB463116 참고. 임시 완화책 공개 여부는 확인 못 함.",
       "detection": "vmdir 감사 로그(/var/log/vmware/vmdird/)에서 비정상 바인드, 새 계정이나 SSO Administrators 그룹 멤버십 변경, 관리망 외부에서 vCenter 389/636/2012 포트로의 연결. Google 블로그의 IOC로 과거 로그 소급 점검 권장(제로데이 기간이 길다)."
+    },
+    "deepDive": null
+  },
+  {
+    "cve": "CVE-2026-123903",
+    "date": "2026-11-27",
+    "grade": "orange",
+    "title": "vCenter vmdir 실패한 SRP SASL bind가 관리자 토큰을 연결에 남기는 인증 우회",
+    "product": "VMware vCenter Server (VMware Directory Service)",
+    "summary": "VMSA-2026-0011(11/24)로 패치된 vCenter 내장 디렉터리(vmdir)의 인증 우회, CVSS 9.8. 공개 PoC 설명에 따르면 SRP 방식 LDAP SASL bind를 관리자 UPN으로 시도하다 증명값이 틀려 실패해도 그 신원의 접근 토큰이 연결에 남아, 이어지는 일반 LDAP 요청이 관리자로 처리된다. 11/20 KEV 등재된 CVE-2026-123890에 이은 같은 컴포넌트의 두 번째 인증 우회이고, Rapid7이 공개 PoC로 우회를 검증했다. 실제 악용 보고와 KEV 등재는 아직 없다.",
+    "cvss": 9.8,
+    "kev": false,
+    "poc": true,
+    "tags": [
+      "vmware",
+      "vcenter",
+      "ldap",
+      "sasl",
+      "srp",
+      "auth-bypass",
+      "poc"
+    ],
+    "links": [
+      {
+        "label": "Broadcom 보안 권고 39626 (VMSA-2026-0011)",
+        "url": "https://support.broadcom.com/web/ecx/support-content-notification/-/external/content/SecurityAdvisories/0/39626"
+      },
+      {
+        "label": "Rapid7 ETR: CVE-2026-123903",
+        "url": "https://www.rapid7.com/blog/post/etr-cve-2026-123903-critical-vmware-directory-service-authentication-bypass-affects-vcenter/"
+      },
+      {
+        "label": "공개 PoC 저장소 dinosn/CVE-2026-123903",
+        "url": "https://github.com/dinosn/CVE-2026-123903"
+      },
+      {
+        "label": "Kudelski Security 분석",
+        "url": "https://kudelskisecurity.com/research/vmware-vcenter-authentication-bypass-in-vmware-directory-service---critical"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-123903"
+      },
+      {
+        "label": "CVE.org",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-123903"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "vmdir는 vCenter SSO가 쓰는 LDAP 디렉터리로, SASL 메커니즘 중 SRP(비밀번호를 보내지 않는 영지식 비밀번호 증명)를 지원한다. 공개 PoC 저장소 설명에 따르면 SRP bind 과정에서 클라이언트가 주장한 UPN으로 연결의 접근 토큰(보안 컨텍스트)이 먼저 만들어져 연결에 붙고, 클라이언트 증명(M1) 검증이 실패해도 그 토큰이 걷히지 않는다. 즉 '증명 성공 후에만 연결에 신원을 바인딩한다'는 불변식이 깨진 실패 시 열림(fail-open) 결함이다(CWE-287 계열). 벤더 권고는 세부를 공개하지 않았고 함수 이름은 확인 못 했다. SRP 상태 머신이 인증 결과와 연결 상태를 분리 관리하는 설계라는 점은 지난주 다룬 Cyrus SASL SRP 결함(CVE-2026-129483)과 닮았다(추정 비교).",
+      "trigger": "원격, 무인증. vCenter의 vmdir LDAP 포트(389/636)에 네트워크로 닿기만 하면 된다. 사용자 상호작용 불필요. 관리자 계정 UPN(예: 기본 SSO 도메인 관리자)을 알아야 하는데 기본값이라 사실상 공개 정보다.",
+      "exploitation": "실패한 bind 뒤 같은 LDAP 연결에서 일반 add, modify 요청이 관리자 권한으로 처리되어, PoC 설명대로 새 계정을 만들고 Administrators 그룹에 넣을 수 있다. 이 계정으로 vCenter에 로그인하면 관리하는 ESXi 전체를 통제하는 데까지 이어진다(개념 수준).",
+      "patch": "vCenter 8.0 U3m, 9.0.2.0300, 9.1.2, VCF 5.2.5에서 수정. 임시 완화책은 없다고 벤더가 밝혔다. 11/20 CVE-2026-123890 패치(8.0 U3l 등)만 적용한 환경은 여전히 취약하니 다시 업데이트해야 한다.",
+      "detection": "vmdir 로그(/var/log/vmware/vmdird/)에서 실패한 SRP SASL bind 직후 같은 연결의 add/modify 작업, 감사 대상 계정의 갑작스런 생성과 Administrators 그룹 변경을 확인. vCenter SSO 이벤트에서 처음 보는 관리자 계정의 로그인. 공식 IOC는 공개되지 않았다.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "재구성, 실제 소스 아님 (PoC 설명 기반 추정)",
+          "lang": "c",
+          "code": "int SrpBindStep(Conn *c, SrpReq *r) {\n    /* 클라이언트가 주장한 UPN으로 토큰을 먼저 만든다 */\n    c->accessToken = BuildTokenForUpn(r->upn);\n    if (!SrpVerifyProof(c->srp, r->m1))\n        return LDAP_INVALID_CREDENTIALS; /* 실패해도 토큰은 연결에 남음 */\n    return LDAP_SUCCESS;\n}"
+        },
+        {
+          "kind": "fix",
+          "label": "재구성, 실제 소스 아님 (수정 방향 추정)",
+          "lang": "c",
+          "code": "int SrpBindStep(Conn *c, SrpReq *r) {\n    if (!SrpVerifyProof(c->srp, r->m1)) {\n        ClearConnIdentity(c);           /* 실패 시 신원 정보 제거 */\n        return LDAP_INVALID_CREDENTIALS;\n    }\n    c->accessToken = BuildTokenForUpn(r->upn); /* 성공 후에만 바인딩 */\n    return LDAP_SUCCESS;\n}"
+        }
+      ]
+    },
+    "deepDive": null
+  },
+  {
+    "cve": "CVE-2026-123910",
+    "date": "2026-11-27",
+    "grade": "orange",
+    "title": "ESX I/O filter 서비스 힙 OOB 쓰기와 UAF (9.8 두 건)",
+    "product": "VMware ESX (ESXi), VMware Cloud Foundation",
+    "summary": "VMSA-2026-0011로 같이 패치된 ESX I/O filter 서비스의 힙 경계 밖 쓰기(CVE-2026-123910)와 UAF(CVE-2026-123911), 둘 다 CVSS 9.8. 벤더는 컴포넌트 이름 외 세부를 공개하지 않았다. 같은 묶음에 ESXi, Workstation, Fusion의 XHCI USB OOB 쓰기(CVE-2026-123912, 9.3)와 VMkernel 스택 오버플로(CVE-2026-123913)도 있다. 악용, PoC 보고는 없다.",
+    "cvss": 9.8,
+    "kev": false,
+    "poc": false,
+    "tags": [
+      "vmware",
+      "esxi",
+      "heap-overflow",
+      "uaf",
+      "hypervisor"
+    ],
+    "links": [
+      {
+        "label": "Broadcom 보안 권고 39626 (VMSA-2026-0011)",
+        "url": "https://support.broadcom.com/web/ecx/support-content-notification/-/external/content/SecurityAdvisories/0/39626"
+      },
+      {
+        "label": "SecurityWeek: VMware Updates Patch Critical ESX, vCenter Vulnerabilities",
+        "url": "https://www.securityweek.com/vmware-updates-patch-critical-esx-vcenter-vulnerabilities/"
+      },
+      {
+        "label": "SecurityOnline: VMSA-2026-0011",
+        "url": "https://securityonline.info/vmware-update-vmsa-2026-0011/"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-123910"
+      },
+      {
+        "label": "CVE.org",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-123910"
+      },
+      {
+        "label": "CVE.org CVE-2026-123911",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-123911"
+      },
+      {
+        "label": "CVE.org CVE-2026-123912",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-123912"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "CVE 레코드는 'I/O filter 서비스의 힙 경계 밖 쓰기'(CWE-787)와 'I/O filter 서비스의 UAF'(CWE-416)라고만 쓴다. I/O filter는 VAIO(vSphere APIs for I/O Filtering) 프레임워크로 가상 디스크 I/O 경로에 캐싱, 복제 같은 필터를 끼우는 구조인데, 어느 데몬과 어떤 메시지 처리에서 길이나 수명이 어긋나는지는 공개된 세부 없음. 9.8(AV:N, PR:N)이라는 점에서 네트워크로 닿는 관리 인터페이스 쪽 처리로 보인다(추정).",
+      "trigger": "CVSS 벡터상 원격 무인증으로 평가됐다. 실제로 어느 포트, 어떤 전제 조건(I/O filter 설치 여부 등)이 필요한지는 확인 못 했다.",
+      "exploitation": "힙 OOB 쓰기와 UAF는 ESX 호스트에서 코드 실행으로 이어질 수 있다고 벤더가 분류했다. 구체적 경로는 공개된 세부 없음.",
+      "patch": "ESXi80U3m-25926933, ESXi-9.0.2.0200-25953133, ESXi-9.1.2.0-25946735, VCF 5.2.5. Workstation, Fusion은 XHCI 건(CVE-2026-123912)에 해당하니 별도 업데이트 필요. XHCI 건은 VM에서 USB 3.x 컨트롤러를 제거하는 것이 과거 VMSA에서 쓰인 일반적 완화책이다.",
+      "detection": "ESXi 호스트의 예기치 않은 데몬 크래시와 코어 덤프(/var/core), hostd, vmkernel 로그의 비정상 종료. 공개 IOC 없음.",
+      "code": []
     },
     "deepDive": null
   },
@@ -6956,6 +7220,194 @@
       "exploitation": "평면 크기 차이만큼 힙 뒤쪽을 프레임 데이터로 덮는 선형 OOB 쓰기. 공개 자료는 힙 손상과 크래시까지만 언급하고 코드 실행 시연은 없다.",
       "patch": "3.33.0에서 h264_context_reset()이 크기 상한(UINT16_MAX)을 검사하고 yuv_ensure_buffer()를 먼저 호출해 버퍼를 확보한 뒤에야 width, height를 갱신하도록 순서를 바꿨다. 다른 호출 경로(avc444 버퍼 등)도 같은 캐시 가정을 쓰는지는 확인 못 함.",
       "detection": "공개 IoC 없음. FreeRDP 서버, 프록시 프로세스의 크래시(Windows면 Application 로그 EID 1000, WER), 세션 중 해상도 변경 직후의 비정상 종료."
+    },
+    "deepDive": null
+  },
+  {
+    "cve": "CVE-2026-137453",
+    "date": "2026-11-27",
+    "grade": "green",
+    "title": "FreeRDP /remoteGuard 사용 시 Client Info 패킷에 비밀번호를 그대로 실어 보냄",
+    "product": "FreeRDP 3.33.0 이전 (클라이언트)",
+    "summary": "Remote Credential Guard는 자격 증명을 원격 서버에 넘기지 않고 Kerberos 요청을 클라이언트로 되돌리는 Windows 기능인데, FreeRDP의 rdp_write_info_packet()은 Restricted Admin과 위임 비활성화만 확인하고 RemoteCredentialGuard 플래그는 확인하지 않았다. 그래서 /remoteGuard와 /p를 같이 쓰면 CredSSP 이후 Client Info 패킷에 도메인, 사용자, 비밀번호가 실려 악성 서버가 재사용 가능한 비밀번호를 얻는다. 보안 기능을 켠 사용자만 당하는 역설적 버그라 볼 만해.",
+    "cvss": 7.1,
+    "kev": false,
+    "poc": false,
+    "tags": [
+      "freerdp",
+      "rdp",
+      "remote-credential-guard",
+      "credential-disclosure"
+    ],
+    "links": [
+      {
+        "label": "GitHub 권고 GHSA-hhfh-fvm7-7w65",
+        "url": "https://github.com/FreeRDP/FreeRDP/security/advisories/GHSA-hhfh-fvm7-7w65"
+      },
+      {
+        "label": "FreeRDP 3.33.0 릴리스",
+        "url": "https://github.com/FreeRDP/FreeRDP/releases/tag/3.33.0"
+      },
+      {
+        "label": "VulnCheck 권고",
+        "url": "https://www.vulncheck.com/advisories/freerdp-before-3.33.0-credential-disclosure-via-remote-credential-guard-client-info"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-137453"
+      },
+      {
+        "label": "CVE.org",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-137453"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "RDP 연결 후반의 Client Info PDU(TS_INFO_PACKET)에는 Domain, UserName, Password 필드가 있고, Restricted Admin이나 Remote Credential Guard처럼 서버에 비밀을 넘기지 않는 모드에서는 이 필드를 비워야 한다. FreeRDP의 libfreerdp/core/info.c rdp_write_info_packet()은 RestrictedAdminModeRequired와 DisableCredentialsDelegation만 검사해 자격 증명 필드를 채울지 결정했고, RemoteCredentialGuard는 조건에서 빠져 있었다. 결과적으로 RCG의 '서버는 평문 비밀을 받지 않는다'는 보안 불변식이 CredSSP 단계에선 지켜지고 Client Info 단계에선 깨진다(CWE-522).",
+      "trigger": "사용자가 공격자가 통제하는(또는 장악한) RDP 서버에 /remoteGuard와 /p 비밀번호를 지정해 접속해야 한다. 사용자 상호작용 필요.",
+      "exploitation": "서버가 Client Info 패킷에서 평문 비밀번호를 그대로 수집하고, 그 계정으로 다른 시스템에 횡적 이동할 수 있다. 메모리 손상은 없다.",
+      "patch": "3.33.0에서 조건문에 FreeRDP_RemoteCredentialGuard 검사가 추가되어 RCG 모드에서는 도메인, 사용자, 비밀번호 필드를 쓰지 않는다. 임시로는 /remoteGuard 사용 시 /p를 지정하지 않는다.",
+      "detection": "클라이언트 쪽 탐지는 어렵다. 접속 대상 서버 목록과 RCG 사용 이력을 대조하는 수준. 공개 IOC 없음.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "재구성, 실제 소스 아님 (3.33.0 코드에서 검사 한 줄을 뺀 형태)",
+          "lang": "c",
+          "code": "/* rdp_write_info_packet() */\nif (!freerdp_settings_get_bool(settings, FreeRDP_RestrictedAdminModeRequired) &&\n    !freerdp_settings_get_bool(settings, FreeRDP_DisableCredentialsDelegation))\n{\n    /* RCG 모드여도 여기로 들어와 비밀번호를 패킷에 씀 */\n    passwordW = freerdp_settings_get_string_as_utf16(settings, FreeRDP_Password, &cbPassword);\n}"
+        },
+        {
+          "kind": "fix",
+          "label": "FreeRDP 3.33.0 libfreerdp/core/info.c 발췌 (수정 후)",
+          "lang": "c",
+          "code": "if (!freerdp_settings_get_bool(settings, FreeRDP_RestrictedAdminModeRequired) &&\n    !freerdp_settings_get_bool(settings, FreeRDP_DisableCredentialsDelegation) &&\n    !freerdp_settings_get_bool(settings, FreeRDP_RemoteCredentialGuard)) /* 추가된 조건 */\n{\n    domainW = freerdp_settings_get_string_as_utf16(settings, FreeRDP_Domain, &cbDomain);"
+        }
+      ]
+    },
+    "deepDive": null
+  },
+  {
+    "cve": "CVE-2026-137456",
+    "date": "2026-11-27",
+    "grade": "green",
+    "title": "FreeRDP GDI ORDER_BOUNDS 누적 좌표 INT32 래핑으로 클리핑 생략, 힙 OOB 쓰기",
+    "product": "FreeRDP 3.33.0 이전 (클라이언트)",
+    "summary": "악성 RDP 서버가 ORDER_BOUNDS를 여러 번 보내 경계 좌표를 누적시키면 INT32가 래핑되어 폭 0인 클립 영역이 되고, gdi_FillRect가 '클립 없음'으로 보고 클리핑을 건너뛴 채 OPAQUE_RECT를 그려 그리기 비트맵 너머에 쓴다. 서버에서 클라이언트로 향하는 역방향 공격면이고 같은 3.33.0 묶음의 일부다. PoC, 악용 보고 없음.",
+    "cvss": 8.8,
+    "kev": false,
+    "poc": false,
+    "tags": [
+      "freerdp",
+      "rdp",
+      "integer-overflow",
+      "heap-overflow",
+      "client-side"
+    ],
+    "links": [
+      {
+        "label": "GitHub 권고 GHSA-2hm9-2h5q-x525",
+        "url": "https://github.com/FreeRDP/FreeRDP/security/advisories/GHSA-2hm9-2h5q-x525"
+      },
+      {
+        "label": "FreeRDP 3.33.0 릴리스",
+        "url": "https://github.com/FreeRDP/FreeRDP/releases/tag/3.33.0"
+      },
+      {
+        "label": "VulnCheck 권고",
+        "url": "https://www.vulncheck.com/advisories/freerdp-before-3.33.0-heap-out-of-bounds-write-via-order-bounds-integer-overflow"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-137456"
+      },
+      {
+        "label": "CVE.org",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-137456"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "RDP 드로잉 오더의 ORDER_BOUNDS는 이전 경계값에 델타를 더하는 방식으로 좌표를 갱신할 수 있다. 권고에 따르면 FreeRDP 클라이언트 GDI가 누적 경계를 INT32로 계산하면서 오버플로를 확인하지 않아, 래핑된 좌표로 너비가 0인 클립 영역이 만들어진다. gdi_FillRect 쪽은 폭 0 클립을 '클리핑 비활성'과 구분하지 않아 클리핑을 아예 건너뛰고, 서버가 준 사각형을 그대로 프레임버퍼에 채운다. '그리기는 항상 클립된 범위 안'이라는 불변식이 산술 오버플로 하나로 무너지는 CWE-190에서 CWE-787로 이어지는 전형이다. 정확한 패치 커밋은 이번 얕은 클론에서 찾지 못해 코드는 재구성이다.",
+      "trigger": "사용자가 악성 또는 장악된 RDP 서버에 FreeRDP 클라이언트로 접속해야 한다.",
+      "exploitation": "클라이언트 프로세스의 그리기 비트맵 뒤 힙 영역에 서버가 고른 색 값으로 사각형 쓰기가 가능해져 코드 실행 가능성이 있다고 권고가 평가했다. 개념 수준 이상은 다루지 않는다.",
+      "patch": "3.33.0에서 경계 누적 계산과 클립 영역 유효성 검사가 보강됐다(정확한 diff 미확인). 신뢰하지 않는 서버에 접속하지 않는 것 외 완화책 없음.",
+      "detection": "FreeRDP 클라이언트 크래시. 공개 IOC 없음.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "재구성, 실제 소스 아님 (권고 설명 기반)",
+          "lang": "c",
+          "code": "/* ORDER_BOUNDS 델타 누적 */\nbounds->left  += delta_left;     /* INT32 래핑 검사 없음 */\nbounds->right += delta_right;\n/* gdi_FillRect */\nif (clip_width == 0)             /* 폭 0 = '클립 없음'으로 해석 */\n    fill_unclipped(dst, rect);    /* 비트맵 밖으로 쓰기 */"
+        },
+        {
+          "kind": "fix",
+          "label": "재구성, 실제 소스 아님 (수정 방향)",
+          "lang": "c",
+          "code": "if (__builtin_add_overflow(bounds->left, delta_left, &bounds->left))\n    return FALSE;                /* 래핑되면 오더 거부 */\n/* gdi_FillRect: 사각형을 항상 비트맵 크기와 교집합 */\nif (!intersect_rect(&rect, &surface_rect))\n    return TRUE;"
+        }
+      ]
+    },
+    "deepDive": null
+  },
+  {
+    "cve": "CVE-2026-137540",
+    "date": "2026-11-27",
+    "grade": "green",
+    "title": "Tornado StaticFileHandler가 Windows에서 NTFS 대체 데이터 스트림(file:stream)을 서빙",
+    "product": "Tornado 6.6.1 이전 (Windows)",
+    "summary": "Windows에서 'file.txt:name'은 file.txt의 대체 데이터 스트림을 뜻하고 abspath, stat, open이 모두 이를 받아들여서, 루트 접두사 검사(_check_in_root)를 통과한 채 스트림 내용이 정적 파일처럼 나간다. Zone.Identifier(다운로드 출처 URL)나 스트림에 숨긴 비밀이 무인증으로 읽힌다. 지난주 Gogs 8.3 짧은 이름 건처럼 'Windows 경로의 별칭'이 접두사 검사를 우회하는 같은 계열이다.",
+    "cvss": 6.9,
+    "kev": false,
+    "poc": false,
+    "tags": [
+      "tornado",
+      "python",
+      "windows",
+      "ntfs-ads",
+      "path-traversal"
+    ],
+    "links": [
+      {
+        "label": "GitHub 권고 GHSA-p3r8-9mfh-25p7",
+        "url": "https://github.com/tornadoweb/tornado/security/advisories/GHSA-p3r8-9mfh-25p7"
+      },
+      {
+        "label": "tornadoweb/tornado 커밋 292f4fa",
+        "url": "https://github.com/tornadoweb/tornado/commit/292f4fa"
+      },
+      {
+        "label": "VulnCheck 권고",
+        "url": "https://www.vulncheck.com/advisories/tornado-before-6.6.1-ntfs-alternate-data-stream-disclosure-via-staticfilehandler"
+      },
+      {
+        "label": "NVD",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-137540"
+      },
+      {
+        "label": "CVE.org",
+        "url": "https://www.cve.org/CVERecord?id=CVE-2026-137540"
+      }
+    ],
+    "history": [],
+    "detail": {
+      "rootCause": "StaticFileHandler._check_in_root()는 os.path.abspath로 정규화한 경로가 정적 루트로 시작하는지만 확인한다. NTFS에서 콜론 뒤는 같은 파일의 다른 데이터 스트림 이름이라 경로 문자열은 루트 안에 그대로 있고, Win32 API(CreateFileW)가 그 스트림을 열어 준다. 즉 '루트 접두사 안의 경로 = 루트 안의 일반 파일'이라는 가정이 Windows 파일 시스템 의미론에서 깨진다(CWE-22, 넓게는 CWE-41 경로 동치 문제).",
+      "trigger": "원격 무인증. Tornado 앱이 Windows에서 StaticFileHandler로 NTFS 볼륨의 디렉터리를 서빙해야 한다. 리눅스는 해당 없음.",
+      "exploitation": "임의 파일 경로로 나가는 게 아니라 루트 아래 파일의 숨은 스트림만 읽힌다. 인터넷에서 받은 파일의 Zone.Identifier에는 ReferrerUrl, HostUrl이 들어 있어 내부 정보가 샐 수 있다.",
+      "patch": "커밋 292f4fa(6.6.1)이 Windows에서 루트 아래 경로 부분에 콜론이 있으면 403을 반환한다. 루트 자체의 드라이브 문자 콜론은 제외한다. get_absolute_path와 validate_absolute_path 모두 _check_in_root를 거치므로 static_url 경로까지 막힌다.",
+      "detection": "웹 접근 로그에서 정적 경로 요청 URL에 콜론(%3A 포함)이 있는 항목, 특히 ':Zone.Identifier' 문자열.",
+      "code": [
+        {
+          "kind": "vuln",
+          "label": "tornadoweb/tornado 커밋 292f4fa 이전 발췌 (tornado/web.py _check_in_root)",
+          "lang": "python",
+          "code": "# 접두사만 검사: 'root\\\\a.txt:secret'도 root로 시작하므로 통과\nif not (absolute_path + os.path.sep).startswith(root):\n    raise HTTPError(403, \"%s is not in root static directory\", path_message)\nreturn root"
+        },
+        {
+          "kind": "fix",
+          "label": "tornadoweb/tornado 커밋 292f4fa 발췌",
+          "lang": "python",
+          "code": " if not (absolute_path + os.path.sep).startswith(root):\n     raise HTTPError(403, \"%s is not in root static directory\", path_message)\n+if os.name == \"nt\" and \":\" in absolute_path[len(root) :]:\n+    # 루트 아래 콜론 = NTFS 대체 데이터 스트림, 거부\n+    raise HTTPError(403, \"%s is not a file\", path_message)\n return root"
+        }
+      ]
     },
     "deepDive": null
   },
