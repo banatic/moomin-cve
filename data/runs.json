@@ -148,5 +148,11 @@
     "note": "CISA KEV 신규 없음(11/25판 이후 갱신 없음). VMSA-2026-0011: vCenter vmdir 실패한 SRP bind 토큰 잔존 인증 우회(공개 PoC, Rapid7 검증), ESX I/O filter OOB 쓰기와 UAF 9.8. nginx2root HTTP/2 두 건(흐름 제어 창 환불 오버플로, reusable 연결 UAF) 실제 diff 기록, CSA 악용 경보 본문 미확인. FreeRDP RCG 비밀번호 전송과 ORDER_BOUNDS 래핑 OOB, Tornado Windows ADS 서빙.",
     "count": 7,
     "deepDive": null
+  },
+  {
+    "date": "2026-11-28",
+    "note": "CISA 11/27 KEV 3건(공지 기준, kev-data repo는 11/25판): GeoServer 서비스 이름 접두사 규칙 우회와 GetFeatureById 저장 쿼리 XML 주입(실제 diff 기록), Drupal 설치기 후속 결함 136716(017 불완전 패치, 실제 diff). RealVNC UDP 무인증 힙 쓰기 9.8, Exim 확장 코드 힙 쓰기, Mitel OpenScape 4000 무인증과 명령 주입, Nmap massdns UAF. 기존 GeoServer 129245, Drupal 132165에 변화 기록.",
+    "count": 7,
+    "deepDive": null
   }
 ]
